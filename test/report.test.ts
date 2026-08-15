@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { analyzeUri } from "../lib/analyzer";
-import { buildRedactedFixture, buildReport, decodeFixture, encodeFixture } from "../lib/report";
+import { buildRedactedFixture, buildReport, decodeFixture, encodeFixture, parseFixtureJson } from "../lib/report";
 
 const shieldedTestnet = "ztestsapling10yy2ex5dcqkclhc7z7yrnjq2z6feyjad56ptwlfgmy77dmaqqrl9gyhprdx59qgmsnyfska2kez";
 
@@ -28,4 +28,7 @@ test("fixture encoding removes raw request, address, and amount data", () => {
   assert.equal(decoded.entries[0]?.amount, "[redacted]");
   assert.equal(JSON.stringify(fixture).includes(shieldedTestnet), false);
   assert.equal(JSON.stringify(fixture).includes("VGVzdA"), false);
+  assert.equal(parseFixtureJson(fixture)?.gate, analysis.gate);
+  assert.equal(parseFixtureJson({ schema: "shadecheck.report" }), null);
+  assert.equal(parseFixtureJson({ ...fixture, analysis: { ...fixture.analysis, entries: [{ ...fixture.analysis.entries[0], address: "zs1raw" }] } }), null);
 });

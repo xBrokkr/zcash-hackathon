@@ -1,9 +1,9 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
-import { AlertTriangle, ArrowUpRight, CheckCircle2, ClipboardList, Copy, Download, FileCheck2, Info, Link2, LockKeyhole, ScanLine, ShieldCheck, TerminalSquare } from "lucide-react";
+import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
+import { AlertTriangle, ArrowUpRight, CheckCircle2, ClipboardList, Copy, Download, FileCheck2, Info, Link2, LockKeyhole, ScanLine, ShieldCheck, TerminalSquare, Upload } from "lucide-react";
 import { Analysis, Finding, analyzeAddress, analyzeUri } from "@/lib/analyzer";
-import { buildRedactedFixture, buildReport, decodeFixture, encodeFixture, fixtureUrl } from "@/lib/report";
+import { buildRedactedFixture, buildReport, decodeFixture, encodeFixture, fixtureUrl, parseFixtureJson } from "@/lib/report";
 
 type Mode = "uri" | "address";
 type FindingFilter = "all" | "block" | "review" | "informational";
@@ -95,6 +95,8 @@ export default function HomePage() {
   const [shareState, setShareState] = useState("Share redacted fixture");
   const [findingFilter, setFindingFilter] = useState<FindingFilter>("all");
   const [isFixture, setIsFixture] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const fixtureInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -160,6 +162,21 @@ export default function HomePage() {
     setChecklistState("Copy fixes");
     setReportState("Download fixture");
     setShareState("Share redacted fixture");
+  }
+
+  function importFixture(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setIsImporting(true);
+    file.text().then((text) => {
+      const fixture = parseFixtureJson(JSON.parse(text));
+      if (!fixture) throw new Error("invalid fixture");
+      loadFixture(fixture);
+      setError("");
+    }).catch(() => {
+      setError("That file is not a valid ShadeCheck redacted fixture. Download a fixture from ShadeCheck and try again.");
+    }).finally(() => setIsImporting(false));
   }
 
   async function copyRequest() {
@@ -305,7 +322,7 @@ export default function HomePage() {
         </section>
 
         <section className="fixture-section" aria-labelledby="fixture-heading">
-          <div className="fixture-heading"><div><div className="eyebrow">Public fixtures</div><h2 id="fixture-heading">Review common integration mistakes.</h2></div><p>These examples contain no wallet data. Open one to see the same rules, sources, and redacted sharing path.</p></div>
+          <div className="fixture-heading"><div><div className="eyebrow">Public fixtures</div><h2 id="fixture-heading">Review common integration mistakes.</h2></div><div className="fixture-heading-actions"><p>These examples contain no wallet data. Open one to see the same rules, sources, and redacted sharing path.</p><button type="button" className="secondary-button" onClick={() => fixtureInputRef.current?.click()} disabled={isImporting} aria-busy={isImporting}><Upload size={15} aria-hidden="true" />{isImporting ? "Importing…" : "Import fixture"}</button><input ref={fixtureInputRef} className="visually-hidden" type="file" accept="application/json,.json" onChange={importFixture} /></div></div>
           <div className="fixture-grid">{publicFixtures.map((fixture) => <article className="panel fixture-card" key={fixture.label}><div className="fixture-card-header"><span className={`fixture-gate ${fixture.analysis.gate}`}>{fixture.analysis.privacyLabel}</span><span>{fixture.analysis.entries.length} payment{fixture.analysis.entries.length === 1 ? "" : "s"}</span></div><h3>{fixture.label}</h3><p>{fixture.description}</p><button type="button" className="secondary-button" onClick={() => loadFixture(fixture.analysis)}>Open fixture <ArrowUpRight size={15} aria-hidden="true" /></button></article>)}</div>
         </section>
 

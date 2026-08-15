@@ -110,13 +110,21 @@ export function encodeFixture(fixture: RedactedFixture): string {
   return bytesToBase64Url(new TextEncoder().encode(JSON.stringify(fixture)));
 }
 
+export function parseFixtureJson(value: unknown): Analysis | null {
+  if (!value || typeof value !== "object") return null;
+  const fixture = value as Partial<RedactedFixture>;
+  if (fixture.schema !== "shadecheck.fixture" || fixture.fixtureVersion !== REPORT_VERSION || fixture.analysis?.normalized !== "[redacted]") return null;
+  if (!Array.isArray(fixture.analysis.entries) || !Array.isArray(fixture.analysis.findings)) return null;
+  if (fixture.analysis.ignoredParameters.length > 0) return null;
+  if (fixture.analysis.entries.some((entry) => entry.address !== "[redacted]" || (entry.amount !== null && entry.amount !== "[redacted]"))) return null;
+  if (fixture.analysis.findings.some((item) => !item.detail.startsWith("Redacted "))) return null;
+  return fixture.analysis as Analysis;
+}
+
 export function decodeFixture(value: string): Analysis | null {
   if (!value || value.length > 12000) return null;
   try {
-    const fixture = JSON.parse(base64UrlToText(value)) as RedactedFixture;
-    if (fixture.schema !== "shadecheck.fixture" || fixture.fixtureVersion !== REPORT_VERSION || fixture.analysis?.normalized !== "[redacted]") return null;
-    if (!Array.isArray(fixture.analysis.entries) || !Array.isArray(fixture.analysis.findings)) return null;
-    return fixture.analysis as Analysis;
+    return parseFixtureJson(JSON.parse(base64UrlToText(value)));
   } catch {
     return null;
   }

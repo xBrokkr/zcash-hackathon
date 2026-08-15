@@ -270,6 +270,12 @@ textarea:focus-visible, button:focus-visible, a:focus-visible { outline: 2px sol
 
 .fixture-heading > p { max-width: 430px; color: var(--muted); font-size: 13px; }
 
+.fixture-heading-actions { display: flex; align-items: flex-end; gap: 12px; }
+
+.fixture-heading-actions > p { max-width: 430px; color: var(--muted); font-size: 13px; }
+
+.visually-hidden { display: none; }
+
 .fixture-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
 
 .fixture-card { display: flex; flex-direction: column; min-height: 210px; padding: 18px; }
@@ -310,6 +316,9 @@ textarea:focus-visible, button:focus-visible, a:focus-visible { outline: 2px sol
   .filter-button { flex-shrink: 0; }
   .report-actions > * { width: 100%; }
   .fixture-heading { align-items: flex-start; flex-direction: column; gap: 10px; }
+  .fixture-heading-actions { align-items: flex-start; flex-direction: column; width: 100%; }
+  .fixture-heading-actions > p { max-width: none; }
+  .fixture-heading-actions .secondary-button { width: 100%; }
   .fixture-grid { grid-template-columns: 1fr; gap: 12px; }
   .below-grid { grid-template-columns: 1fr; gap: 12px; }
   .footer { flex-direction: column; }
