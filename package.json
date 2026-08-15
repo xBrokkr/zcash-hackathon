@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test": "tsx --test test/*.test.ts"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
@@ -20,6 +21,7 @@
     "@types/react-dom": "^19.2.4",
     "eslint": "^9.0.0",
     "eslint-config-next": "^16.3.1",
+    "tsx": "^4.23.12",
     "typescript": "^5.7.2"
   }
 }
