@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "test": "tsx --test test/*.test.ts"
+    "test": "tsx --test test/*.test.ts",
+    "shadecheck": "tsx bin/shadecheck.ts"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",

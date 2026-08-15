@@ -1,0 +1,25 @@
+name: ShadeCheck
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  privacy-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Run analyzer tests
+        run: npm test
+      - name: Run lint
+        run: npm run lint
+      - name: Run CLI smoke check
+        run: printf '%s' 'zcash:ztestsapling10yy2ex5dcqkclhc7z7yrnjq2z6feyjad56ptwlfgmy77dmaqqrl9gyhprdx59qgmsnyfska2kez?amount=1' | npm run shadecheck -- --mode uri
