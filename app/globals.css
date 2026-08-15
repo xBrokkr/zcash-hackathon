@@ -81,7 +81,7 @@ h1 { max-width: 700px; font-size: clamp(28px, 5vw, 36px); font-weight: 600; lett
 
 .mode-switch { display: inline-flex; flex-shrink: 0; gap: 4px; padding: 4px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-soft); }
 
-.mode-button, .sample-button, .secondary-button, .primary-button, .icon-button {
+.mode-button, .sample-button, .secondary-button, .primary-button, .icon-button, .filter-button {
   min-height: 40px;
   border: 1px solid transparent;
   border-radius: var(--radius);
@@ -196,6 +196,26 @@ textarea:focus-visible, button:focus-visible, a:focus-visible { outline: 2px sol
 
 .finding-source { display: inline-flex; align-items: center; gap: 4px; margin-top: 9px; color: var(--muted); font-size: 12px; text-decoration: underline; text-underline-offset: 3px; }
 
+.finding-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+
+.filter-list { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.filter-button { padding: 0 10px; border-color: var(--border); background: transparent; color: var(--muted); font-size: 11px; }
+
+.filter-button[aria-pressed="true"] { border-color: var(--border-strong); background: var(--surface-raised); color: var(--foreground); }
+
+.filter-button:hover { border-color: var(--border-strong); color: var(--foreground); }
+
+.finding-count { flex-shrink: 0; color: var(--subtle); font-size: 11px; }
+
+.empty-findings { display: grid; gap: 8px; padding: 18px 12px; border: 1px dashed var(--border-strong); border-radius: var(--radius); background: var(--surface-soft); text-align: center; }
+
+.empty-title { font-size: 13px; font-weight: 600; }
+
+.empty-findings p { color: var(--muted); font-size: 12px; }
+
+.empty-findings .secondary-button { justify-self: center; }
+
 .confidence-note, .ignored-note { display: flex; gap: 8px; margin-top: 16px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius); color: var(--muted); font-size: 12px; }
 
 .confidence-note svg, .ignored-note svg { flex-shrink: 0; margin-top: 2px; color: var(--foreground); }
@@ -224,6 +244,8 @@ textarea:focus-visible, button:focus-visible, a:focus-visible { outline: 2px sol
 
 .report-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
 
+.redacted-badge { display: inline-flex; align-items: center; gap: 7px; min-height: 40px; padding: 0 12px; border: 1px dashed var(--border-strong); border-radius: var(--radius); color: var(--muted); font-size: 12px; }
+
 .report-note { display: flex; gap: 8px; margin-top: 16px; color: var(--subtle); font-size: 12px; }
 
 .report-note svg { flex-shrink: 0; margin-top: 2px; }
@@ -237,6 +259,32 @@ textarea:focus-visible, button:focus-visible, a:focus-visible { outline: 2px sol
 .info-card h2 svg { color: var(--accent); }
 
 .info-card p { margin-top: 10px; color: var(--muted); font-size: 13px; }
+
+.fixture-section { padding-bottom: 72px; }
+
+.fixture-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 18px; }
+
+.fixture-heading .eyebrow { margin-bottom: 8px; }
+
+.fixture-heading h2 { font-size: 22px; font-weight: 600; letter-spacing: -.025em; }
+
+.fixture-heading > p { max-width: 430px; color: var(--muted); font-size: 13px; }
+
+.fixture-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+
+.fixture-card { display: flex; flex-direction: column; min-height: 210px; padding: 18px; }
+
+.fixture-card-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--subtle); font-size: 11px; }
+
+.fixture-gate { display: inline-flex; align-items: center; min-height: 28px; padding: 0 9px; border: 1px solid var(--border-strong); border-radius: var(--radius); color: var(--foreground); font-weight: 600; }
+
+.fixture-gate.review { border-style: dashed; color: var(--muted); }
+
+.fixture-card h3 { margin-top: 22px; font-size: 15px; font-weight: 600; }
+
+.fixture-card > p { margin-top: 8px; color: var(--muted); font-size: 13px; }
+
+.fixture-card .secondary-button { align-self: flex-start; margin-top: auto; }
 
 .footer { display: flex; justify-content: space-between; gap: 16px; padding: 20px 0 32px; border-top: 1px solid var(--border); color: var(--subtle); font-size: 12px; }
 
@@ -257,6 +305,12 @@ textarea:focus-visible, button:focus-visible, a:focus-visible { outline: 2px sol
   .form-actions { align-items: stretch; flex-direction: column; }
   .sample-row { order: 2; }
   .primary-button { width: 100%; }
+  .finding-toolbar { align-items: flex-start; flex-direction: column; }
+  .filter-list { width: 100%; overflow-x: auto; flex-wrap: nowrap; padding-bottom: 2px; }
+  .filter-button { flex-shrink: 0; }
+  .report-actions > * { width: 100%; }
+  .fixture-heading { align-items: flex-start; flex-direction: column; gap: 10px; }
+  .fixture-grid { grid-template-columns: 1fr; gap: 12px; }
   .below-grid { grid-template-columns: 1fr; gap: 12px; }
   .footer { flex-direction: column; }
 }

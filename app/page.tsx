@@ -1,14 +1,70 @@
 "use client";
 
-import { FormEvent, useState } from "react";
-import { AlertTriangle, ArrowUpRight, CheckCircle2, Copy, Download, FileCheck2, Info, LockKeyhole, ScanLine, ShieldCheck, TerminalSquare } from "lucide-react";
+import { FormEvent, useEffect, useState } from "react";
+import { AlertTriangle, ArrowUpRight, CheckCircle2, ClipboardList, Copy, Download, FileCheck2, Info, Link2, LockKeyhole, ScanLine, ShieldCheck, TerminalSquare } from "lucide-react";
 import { Analysis, Finding, analyzeAddress, analyzeUri } from "@/lib/analyzer";
+import { buildRedactedFixture, buildReport, decodeFixture, encodeFixture, fixtureUrl } from "@/lib/report";
 
 type Mode = "uri" | "address";
+type FindingFilter = "all" | "block" | "review" | "informational";
 
 const samples = [
   { label: "Shielded testnet", value: "zcash:ztestsapling10yy2ex5dcqkclhc7z7yrnjq2z6feyjad56ptwlfgmy77dmaqqrl9gyhprdx59qgmsnyfska2kez?amount=1" },
   { label: "Transparent testnet", value: "zcash:tmEZhbWHTpdKMw5it8YDspUXSMGQyFwovpU?amount=1" },
+];
+
+const publicFixtures: Array<{ label: string; description: string; analysis: Analysis }> = [
+  {
+    label: "Transparent output",
+    description: "A payment request routes value to a transparent receiver.",
+    analysis: {
+      inputType: "uri",
+      normalized: "[redacted]",
+      network: "testnet",
+      score: 78,
+      gate: "block",
+      privacyLabel: "Blocked",
+      confidence: "shape-only",
+      entries: [{ index: "", address: "[redacted]", classification: "transparent", network: "testnet", validation: "shape-only", amount: "[redacted]", hasMemo: false, hasAssetRequest: false }],
+      findings: [{ id: "zip321.transparent", title: "Transparent payment path", detail: "Redacted block finding for this request.", level: "block", source: "https://zips.z.cash/zip-0321#uri-semantics", fix: "Use a shielded-capable receiver when this payment claims privacy." }],
+      ignoredParameters: [],
+    },
+  },
+  {
+    label: "Amount missing",
+    description: "A shielded-capable request leaves the wallet to ask for the amount.",
+    analysis: {
+      inputType: "uri",
+      normalized: "[redacted]",
+      network: "testnet",
+      score: 92,
+      gate: "review",
+      privacyLabel: "Review required",
+      confidence: "shape-only",
+      entries: [{ index: "", address: "[redacted]", classification: "shielded", network: "testnet", validation: "shape-only", amount: null, hasMemo: false, hasAssetRequest: false }],
+      findings: [{ id: "zip321.amount-missing", title: "Payment amount is missing", detail: "Redacted review finding for this request.", level: "review", source: "https://zips.z.cash/zip-0321#query-keys", fix: "Include an amount so the wallet does not require manual re-entry." }],
+      ignoredParameters: [],
+    },
+  },
+  {
+    label: "Mixed network",
+    description: "One request contains payment targets from different Zcash networks.",
+    analysis: {
+      inputType: "uri",
+      normalized: "[redacted]",
+      network: "mixed",
+      score: 56,
+      gate: "block",
+      privacyLabel: "Blocked",
+      confidence: "shape-only",
+      entries: [
+        { index: "", address: "[redacted]", classification: "transparent", network: "testnet", validation: "shape-only", amount: "[redacted]", hasMemo: false, hasAssetRequest: false },
+        { index: "1", address: "[redacted]", classification: "shielded", network: "mainnet", validation: "shape-only", amount: "[redacted]", hasMemo: false, hasAssetRequest: false },
+      ],
+      findings: [{ id: "zip321.network", title: "Network mismatch", detail: "Redacted block finding for this request.", level: "block", source: "https://zips.z.cash/zip-0321#uri-semantics", fix: "Use only mainnet addresses or only testnet addresses in one request." }],
+      ignoredParameters: [],
+    },
+  },
 ];
 
 function FindingIcon({ level }: { level: Finding["level"] }) {
@@ -17,12 +73,12 @@ function FindingIcon({ level }: { level: Finding["level"] }) {
   return <Info size={16} aria-hidden="true" />;
 }
 
-function downloadReport(analysis: Analysis) {
-  const blob = new Blob([JSON.stringify(analysis, null, 2)], { type: "application/json" });
+function downloadJson(filename: string, payload: unknown) {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = "shadecheck-report.json";
+  anchor.download = filename;
   anchor.click();
   URL.revokeObjectURL(url);
 }
@@ -34,6 +90,28 @@ export default function HomePage() {
   const [error, setError] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [copyState, setCopyState] = useState("Copy request");
+  const [checklistState, setChecklistState] = useState("Copy fixes");
+  const [reportState, setReportState] = useState("Download report");
+  const [shareState, setShareState] = useState("Share redacted fixture");
+  const [findingFilter, setFindingFilter] = useState<FindingFilter>("all");
+  const [isFixture, setIsFixture] = useState(false);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const encodedFixture = window.location.hash.startsWith("#fixture=") ? window.location.hash.slice("#fixture=".length) : "";
+      if (!encodedFixture) return;
+      const fixture = decodeFixture(encodedFixture);
+      if (!fixture) {
+        setError("This fixture link is invalid or incomplete. Paste the original request to run a fresh review.");
+        return;
+      }
+      setMode(fixture.inputType);
+      setAnalysis(fixture);
+      setIsFixture(true);
+      setFindingFilter("all");
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   function runAnalysis(nextValue = value, nextMode = mode) {
     setError("");
@@ -42,6 +120,10 @@ export default function HomePage() {
       setError("Paste a ZIP-321 request or a Zcash address before analyzing.");
       return;
     }
+    setIsFixture(false);
+    setFindingFilter("all");
+    setReportState("Download report");
+    setShareState("Share redacted fixture");
     setIsAnalyzing(true);
     window.setTimeout(() => {
       setAnalysis(nextMode === "uri" ? analyzeUri(nextValue) : analyzeAddress(nextValue));
@@ -59,10 +141,29 @@ export default function HomePage() {
     setAnalysis(null);
     setError("");
     setCopyState("Copy request");
+    setChecklistState("Copy fixes");
+    setReportState("Download report");
+    setShareState("Share redacted fixture");
+    setFindingFilter("all");
+    setIsFixture(false);
+  }
+
+  function loadFixture(fixture: Analysis) {
+    window.history.replaceState(null, "", `#fixture=${encodeFixture(buildRedactedFixture(fixture))}`);
+    setMode(fixture.inputType);
+    setValue("");
+    setAnalysis(fixture);
+    setError("");
+    setIsFixture(true);
+    setFindingFilter("all");
+    setCopyState("Copy request");
+    setChecklistState("Copy fixes");
+    setReportState("Download fixture");
+    setShareState("Share redacted fixture");
   }
 
   async function copyRequest() {
-    if (!analysis?.normalized) return;
+    if (!analysis?.normalized || isFixture) return;
     try {
       await navigator.clipboard.writeText(analysis.normalized);
       setCopyState("Copied");
@@ -71,6 +172,63 @@ export default function HomePage() {
       setError("Clipboard access is unavailable. Select the request manually to copy it.");
     }
   }
+
+  async function copyFixChecklist() {
+    if (!analysis) return;
+    const fixes = analysis.findings.filter((item) => item.level !== "pass").map((item) => `- ${item.title}: ${item.fix}`);
+    const checklist = fixes.length > 0 ? `ShadeCheck fix checklist\n\n${fixes.join("\n")}` : "ShadeCheck fix checklist\n\nNo blocking or review-level fixes.";
+    try {
+      await navigator.clipboard.writeText(checklist);
+      setChecklistState("Fixes copied");
+      window.setTimeout(() => setChecklistState("Copy fixes"), 1800);
+    } catch {
+      setError("Clipboard access is unavailable. Open the downloaded report to copy the fixes manually.");
+    }
+  }
+
+  async function downloadReportArtifact() {
+    if (!analysis) return;
+    setReportState("Preparing…");
+    try {
+      if (isFixture) {
+        downloadJson("shadecheck-fixture.json", buildRedactedFixture(analysis));
+      } else {
+        downloadJson("shadecheck-report.json", await buildReport(analysis));
+      }
+      setReportState(isFixture ? "Fixture downloaded" : "Report downloaded");
+      window.setTimeout(() => setReportState(isFixture ? "Download fixture" : "Download report"), 2200);
+    } catch {
+      setError("The report could not be prepared in this browser. Try the review again or use the fix checklist.");
+      setReportState(isFixture ? "Download fixture" : "Download report");
+    }
+  }
+
+  async function shareRedactedFixture() {
+    if (!analysis) return;
+    setShareState("Preparing…");
+    try {
+      const link = fixtureUrl(buildRedactedFixture(analysis));
+      await navigator.clipboard.writeText(link);
+      setShareState("Link copied");
+      window.setTimeout(() => setShareState("Share redacted fixture"), 2200);
+    } catch {
+      setError("The redacted link could not be copied. Download the fixture instead and share that file.");
+      setShareState("Share redacted fixture");
+    }
+  }
+
+  const visibleFindings = analysis?.findings.filter((item) => {
+    if (findingFilter === "all") return true;
+    if (findingFilter === "informational") return item.level === "pass" || item.level === "note";
+    return item.level === findingFilter;
+  }) ?? [];
+
+  const findingFilters: Array<{ value: FindingFilter; label: string }> = [
+    { value: "all", label: "All" },
+    { value: "block", label: "Block" },
+    { value: "review", label: "Review" },
+    { value: "informational", label: "Pass / note" },
+  ];
 
   return (
     <div className="app-shell">
@@ -99,7 +257,7 @@ export default function HomePage() {
             <form className="input-area" onSubmit={submit}>
               <label className="field-label" htmlFor="analysis-input">{mode === "uri" ? "Payment request" : "Zcash address"}</label>
               <div className="input-wrap">
-                <textarea id="analysis-input" value={value} onChange={(event) => { setValue(event.target.value); setError(""); }} placeholder={mode === "uri" ? "zcash:ztestsapling1...?amount=1" : "u1... or zs1..."} aria-describedby="analysis-help" spellCheck={false} autoCapitalize="none" />
+              <textarea id="analysis-input" value={value} onChange={(event) => { setValue(event.target.value); setError(""); setIsFixture(false); }} placeholder={mode === "uri" ? "zcash:ztestsapling1...?amount=1" : "u1... or zs1..."} aria-describedby="analysis-help" spellCheck={false} autoCapitalize="none" />
               </div>
               <p id="analysis-help" className="input-help">Local policy and encoding-shape analysis only. Full checksum, receiver composition, and transaction verification stay in the wallet.</p>
               <div className="form-actions">
@@ -124,12 +282,18 @@ export default function HomePage() {
                   <div><span>Payments</span><strong>{analysis.entries.length}</strong></div>
                   <div><span>Input</span><strong>{analysis.inputType === "uri" ? "ZIP-321" : "Address"}</strong></div>
                 </div>
-                <div className="entry-list">{analysis.entries.map((entry) => <div className="entry-row" key={`${entry.index}-${entry.address}`}><div><span className="entry-index">Payment {entry.index || "0"}</span><strong>{entry.classification}</strong><small>{entry.network} · {entry.validation}</small></div><div className="entry-flags"><span>{entry.amount ? `${entry.amount} ZEC` : entry.hasAssetRequest ? "custom asset" : "amount missing"}</span>{entry.hasMemo ? <span>memo</span> : null}</div></div>)}</div>
+                <div className="entry-list">{analysis.entries.map((entry) => <div className="entry-row" key={`${entry.index}-${entry.address}`}><div><span className="entry-index">Payment {entry.index || "0"}</span><strong>{entry.classification}</strong><small>{entry.network} · {entry.validation}</small></div><div className="entry-flags"><span>{entry.amount === "[redacted]" ? "amount redacted" : entry.amount ? `${entry.amount} ZEC` : entry.hasAssetRequest ? "custom asset" : "amount missing"}</span>{entry.hasMemo ? <span>memo</span> : null}</div></div>)}</div>
                 <div className="section-label">Findings</div>
-                <div className="finding-list">{analysis.findings.map((item) => <div className={`finding ${item.level}`} key={`${item.id}-${item.scope ?? "global"}`}><FindingIcon level={item.level} /><div><div className="finding-title">{item.title}</div><div className="finding-detail">{item.detail}</div><div className="finding-fix"><strong>Next:</strong> {item.fix}</div><a className="finding-source" href={item.source} target="_blank" rel="noreferrer">Source <ArrowUpRight size={12} aria-hidden="true" /></a></div></div>)}</div>
+                <div className="finding-toolbar" aria-label="Finding filters">
+                  <div className="filter-list">
+                    {findingFilters.map((filter) => <button type="button" key={filter.value} className="filter-button" aria-pressed={findingFilter === filter.value} onClick={() => setFindingFilter(filter.value)}>{filter.label}</button>)}
+                  </div>
+                  <span className="finding-count" aria-live="polite">{visibleFindings.length} shown</span>
+                </div>
+                {visibleFindings.length > 0 ? <div className="finding-list">{visibleFindings.map((item) => <div className={`finding ${item.level}`} key={`${item.id}-${item.scope ?? "global"}`}><FindingIcon level={item.level} /><div><div className="finding-title">{item.title}</div><div className="finding-detail">{item.detail}</div><div className="finding-fix"><strong>Next:</strong> {item.fix}</div><a className="finding-source" href={item.source} target="_blank" rel="noreferrer">Source <ArrowUpRight size={12} aria-hidden="true" /></a></div></div>)}</div> : <div className="empty-findings"><div className="empty-title">No findings in this filter</div><p>Choose All to see every local rule result.</p><button type="button" className="secondary-button" onClick={() => setFindingFilter("all")}>Show all findings</button></div>}
                 {analysis.ignoredParameters.length > 0 ? <div className="ignored-note"><Info size={15} aria-hidden="true" /><span>Ignored optional parameters: {analysis.ignoredParameters.join(", ")}</span></div> : null}
-                <div className="report-actions"><button type="button" className="secondary-button" onClick={copyRequest}><Copy size={15} aria-hidden="true" />{copyState}</button><button type="button" className="secondary-button" onClick={() => downloadReport(analysis)}><Download size={15} aria-hidden="true" />Download report</button></div>
-                <div className="report-note"><LockKeyhole size={15} aria-hidden="true" /><span>The report is generated locally. ShadeCheck does not query the chain, sign a transaction, or broadcast funds.</span></div>
+                <div className="report-actions">{!isFixture ? <button type="button" className="secondary-button" onClick={copyRequest}><Copy size={15} aria-hidden="true" />{copyState}</button> : <span className="redacted-badge"><LockKeyhole size={14} aria-hidden="true" />Raw input redacted</span>}<button type="button" className="secondary-button" onClick={copyFixChecklist}><ClipboardList size={15} aria-hidden="true" />{checklistState}</button><button type="button" className="secondary-button" onClick={downloadReportArtifact}><Download size={15} aria-hidden="true" />{isFixture ? reportState.replace("report", "fixture") : reportState}</button><button type="button" className="secondary-button" onClick={shareRedactedFixture}><Link2 size={15} aria-hidden="true" />{shareState}</button></div>
+                <div className="report-note"><LockKeyhole size={15} aria-hidden="true" /><span>{isFixture ? "This is a redacted fixture. Addresses, amounts, and raw request text are not included." : "The report is generated locally. Downloaded reports include a SHA-256 input hash; ShadeCheck does not query the chain, sign a transaction, or broadcast funds."}</span></div>
               </div>}
           </div>
         </section>
@@ -138,6 +302,11 @@ export default function HomePage() {
           <article className="panel info-card"><h2><ScanLine size={17} aria-hidden="true" />Parse the request</h2><p>Read ZIP-321 addresses, amounts, memos, assets, and indexed payments without sending input to a server.</p></article>
           <article className="panel info-card"><h2><ShieldCheck size={17} aria-hidden="true" />Explain exposure</h2><p>Separate transparent, shielded-capable, mixed, unknown, and cross-network paths in language a product team can use.</p></article>
           <article className="panel info-card"><h2><TerminalSquare size={17} aria-hidden="true" />Ship with confidence</h2><p>The next phase extracts these rules into a CLI and CI check for Zcash checkout integrations.</p></article>
+        </section>
+
+        <section className="fixture-section" aria-labelledby="fixture-heading">
+          <div className="fixture-heading"><div><div className="eyebrow">Public fixtures</div><h2 id="fixture-heading">Review common integration mistakes.</h2></div><p>These examples contain no wallet data. Open one to see the same rules, sources, and redacted sharing path.</p></div>
+          <div className="fixture-grid">{publicFixtures.map((fixture) => <article className="panel fixture-card" key={fixture.label}><div className="fixture-card-header"><span className={`fixture-gate ${fixture.analysis.gate}`}>{fixture.analysis.privacyLabel}</span><span>{fixture.analysis.entries.length} payment{fixture.analysis.entries.length === 1 ? "" : "s"}</span></div><h3>{fixture.label}</h3><p>{fixture.description}</p><button type="button" className="secondary-button" onClick={() => loadFixture(fixture.analysis)}>Open fixture <ArrowUpRight size={15} aria-hidden="true" /></button></article>)}</div>
         </section>
 
         <footer className="footer"><span>ShadeCheck is an early privacy linting prototype.</span><a href="https://zips.z.cash/zip-0321" target="_blank" rel="noreferrer">Read ZIP-321 <ArrowUpRight size={12} aria-hidden="true" /></a></footer>
