@@ -8,6 +8,7 @@ import { buildRedactedFixture, buildReport, decodeFixture, encodeFixture, fixtur
 type Mode = "uri" | "address";
 type FindingFilter = "all" | "block" | "review" | "informational";
 type InputExample = { label: string; value: string };
+type CheckoutScenario = InputExample & { eyebrow: string; description: string; expected: string };
 
 const shieldedTestnet = "ztestsapling10yy2ex5dcqkclhc7z7yrnjq2z6feyjad56ptwlfgmy77dmaqqrl9gyhprdx59qgmsnyfska2kez";
 const transparentTestnet = "tmEZhbWHTpdKMw5it8YDspUXSMGQyFwovpU";
@@ -25,6 +26,23 @@ const examplesByMode: Record<Mode, InputExample[]> = {
     { label: "Unified address", value: unifiedMainnet },
   ],
 };
+
+const checkoutScenarios: CheckoutScenario[] = [
+  {
+    label: "Transparent fallback",
+    eyebrow: "Common integration mistake",
+    description: "A checkout promises privacy but falls back to a transparent receiver.",
+    expected: "Should block",
+    value: `zcash:${transparentTestnet}?amount=0.25`,
+  },
+  {
+    label: "Shielded checkout",
+    eyebrow: "Safer starting point",
+    description: "A payment request uses a shielded-capable receiver and includes the amount.",
+    expected: "Should pass",
+    value: `zcash:${shieldedTestnet}?amount=0.25`,
+  },
+];
 
 const publicFixtures: Array<{ label: string; description: string; analysis: Analysis }> = [
   {
@@ -84,6 +102,64 @@ function FindingIcon({ level }: { level: Finding["level"] }) {
   if (level === "block" || level === "review") return <AlertTriangle size={16} aria-hidden="true" />;
   if (level === "pass") return <CheckCircle2 size={16} aria-hidden="true" />;
   return <Info size={16} aria-hidden="true" />;
+}
+
+function buildPrivacyImpact(analysis: Analysis) {
+  const hasTransparent = analysis.entries.some((entry) => entry.classification === "transparent");
+  const hasInvalid = analysis.entries.some((entry) => entry.validation === "invalid");
+  const hasMixedNetwork = analysis.network === "mixed";
+
+  if (hasInvalid) {
+    return {
+      title: "Correct the request before reviewing privacy.",
+      description: "At least one address or payment field failed local format validation, so the privacy result is not reliable yet.",
+      publicView: "Not assessed",
+      action: "Fix the format finding first, then run the review again.",
+    };
+  }
+
+  if (hasMixedNetwork) {
+    return {
+      title: "Do not ship this checkout yet.",
+      description: "This request combines networks. A wallet or product flow could interpret the payment differently than intended.",
+      publicView: "Network path is ambiguous",
+      action: "Use one network consistently across every payment target.",
+    };
+  }
+
+  if (hasTransparent) {
+    return {
+      title: "Do not ship this checkout yet.",
+      description: "A transparent receiver is part of this request. The public transaction path can expose the receiver and value; linkability depends on the full transaction.",
+      publicView: "Receiver and value may be public",
+      action: "Replace the transparent path with a shielded-capable receiver, then review again.",
+    };
+  }
+
+  if (analysis.gate === "block") {
+    return {
+      title: "Do not ship this checkout yet.",
+      description: "A local policy rule blocked this request before it can be treated as a privacy-safe checkout.",
+      publicView: "Privacy result is blocked",
+      action: analysis.findings.find((item) => item.level === "block")?.fix ?? "Resolve the blocking finding and run the review again.",
+    };
+  }
+
+  if (analysis.gate === "review") {
+    return {
+      title: "Review this checkout before release.",
+      description: "The request is not blocked by the local policy, but it still needs a product decision before it can claim a complete privacy-preserving flow.",
+      publicView: "No transparent path detected",
+      action: analysis.findings.find((item) => item.level === "review")?.fix ?? "Resolve the review finding before release.",
+    };
+  }
+
+  return {
+    title: "This checkout passes the local privacy gate.",
+    description: "No transparent payment path was detected and the request includes the fields required for this local policy check.",
+    publicView: "No transparent path detected",
+    action: "Keep this rule check in CI and let the wallet perform complete validation before sending.",
+  };
 }
 
 function downloadJson(filename: string, payload: unknown) {
@@ -163,6 +239,10 @@ export default function HomePage() {
     setMode(exampleMode);
     setValue(example.value);
     runAnalysis(example.value, exampleMode, true);
+  }
+
+  function runScenario(scenario: CheckoutScenario) {
+    runExample(scenario, "uri");
   }
 
   function chooseMode(nextMode: Mode) {
@@ -267,6 +347,7 @@ export default function HomePage() {
     if (findingFilter === "informational") return item.level === "pass" || item.level === "note";
     return item.level === findingFilter;
   }) ?? [];
+  const privacyImpact = analysis ? buildPrivacyImpact(analysis) : null;
 
   const findingFilters: Array<{ value: FindingFilter; label: string }> = [
     { value: "all", label: "All" },
@@ -288,6 +369,29 @@ export default function HomePage() {
           <h1>Catch privacy leaks before they ship.</h1>
           <p className="hero-copy">Inspect a Zcash payment request or address and get a plain-language policy review. ShadeCheck runs in your browser and never asks for keys or funds.</p>
           <div className="hero-note"><LockKeyhole size={15} aria-hidden="true" />Nothing is uploaded or stored.</div>
+        </section>
+
+        <section className="lab-section" aria-labelledby="lab-heading">
+          <div className="lab-heading">
+            <div>
+              <div className="eyebrow">Guided demo</div>
+              <h2 id="lab-heading">See a privacy leak before it ships.</h2>
+              <p className="lab-copy">Choose a realistic checkout path. ShadeCheck turns the request into a policy gate, an exposure explanation, and a fix you can act on.</p>
+            </div>
+            <div className="lab-steps" aria-label="Privacy Checkout Lab steps">
+              <span><b>1</b> Choose</span>
+              <span><b>2</b> Review</span>
+              <span><b>3</b> Fix</span>
+            </div>
+          </div>
+          <div className="lab-grid">
+            {checkoutScenarios.map((scenario) => <article className="panel lab-card" key={scenario.label}>
+              <div className="lab-card-kicker">{scenario.eyebrow}</div>
+              <div className="lab-card-topline"><h3>{scenario.label}</h3><span>{scenario.expected}</span></div>
+              <p>{scenario.description}</p>
+              <button type="button" className="secondary-button" onClick={() => runScenario(scenario)}>Run scenario <ArrowUpRight size={15} aria-hidden="true" /></button>
+            </article>)}
+          </div>
         </section>
 
         <section className="workspace" aria-label="ShadeCheck analyzer">
@@ -325,6 +429,7 @@ export default function HomePage() {
               <div className="analysis-body">
                 <div className="analysis-summary"><div className="gate-block"><div className="gate-label">Policy gate</div><div className={`summary-tag ${analysis.gate}`} aria-label={`Policy gate: ${analysis.privacyLabel}`}>{analysis.privacyLabel}</div></div><div className="score-summary"><div className="score-block"><span className="score-number">{analysis.score}</span><span className="score-denominator">/ 100</span></div><div className="score-label">Secondary signal score</div></div></div>
                 <div className="confidence-note"><Info size={15} aria-hidden="true" /><span>{analysis.confidence === "shape-only" ? "Confidence: shape-only. Supported outer checksums are checked; full receiver composition and wallet-level context are not verified here." : "Confidence: format error. At least one address failed the local encoding or checksum check."}</span></div>
+                {privacyImpact ? <div className={`impact-card ${analysis.gate}`} aria-live="polite"><div className="impact-kicker">Privacy impact</div><h3>{privacyImpact.title}</h3><p>{privacyImpact.description}</p><div className="impact-grid"><div><span>Public transaction view</span><strong>{privacyImpact.publicView}</strong></div><div><span>Next action</span><strong>{privacyImpact.action}</strong></div></div></div> : null}
                 <div className="section-label">Request anatomy</div>
                 <div className="anatomy-grid">
                   <div><span>Network</span><strong>{analysis.network}</strong></div>

@@ -69,6 +69,36 @@ h1 { max-width: 700px; font-size: clamp(28px, 5vw, 36px); font-weight: 600; lett
 
 .hero-note { display: inline-flex; align-items: center; gap: 8px; margin-top: 22px; color: var(--subtle); font-size: 13px; }
 
+.lab-section { padding-bottom: 40px; }
+
+.lab-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 18px; }
+
+.lab-heading h2 { max-width: 560px; font-size: 24px; font-weight: 600; letter-spacing: -.03em; line-height: 1.15; }
+
+.lab-copy { max-width: 620px; margin-top: 10px; color: var(--muted); font-size: 13px; }
+
+.lab-steps { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; color: var(--subtle); font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; }
+
+.lab-steps span { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 9px; border: 1px solid var(--border); border-radius: var(--radius); }
+
+.lab-steps b { color: var(--foreground); font-weight: 600; }
+
+.lab-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+
+.lab-card { display: flex; min-height: 196px; flex-direction: column; padding: 20px; }
+
+.lab-card-kicker, .impact-kicker { color: var(--subtle); font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }
+
+.lab-card-topline { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 18px; }
+
+.lab-card h3 { font-size: 16px; font-weight: 600; }
+
+.lab-card-topline span { flex-shrink: 0; color: var(--muted); font-size: 11px; }
+
+.lab-card p { max-width: 460px; margin-top: 8px; color: var(--muted); font-size: 13px; }
+
+.lab-card .secondary-button { align-self: flex-start; margin-top: auto; }
+
 .workspace { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(320px, .9fr); gap: 16px; padding-bottom: 56px; }
 
 .panel { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
@@ -232,6 +262,24 @@ textarea:focus-visible, button:focus-visible, a:focus-visible { outline: 2px sol
 
 .confidence-note svg, .ignored-note svg { flex-shrink: 0; margin-top: 2px; color: var(--foreground); }
 
+.impact-card { margin-top: 16px; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-soft); }
+
+.impact-card.review { border-style: dashed; }
+
+.impact-card.block { border-color: var(--border-strong); }
+
+.impact-card h3 { margin-top: 8px; font-size: 15px; font-weight: 600; }
+
+.impact-card > p { max-width: 580px; margin-top: 6px; color: var(--muted); font-size: 12px; }
+
+.impact-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 14px; }
+
+.impact-grid > div { display: flex; min-height: 72px; flex-direction: column; gap: 5px; padding: 10px; border: 1px solid var(--border); border-radius: var(--radius); }
+
+.impact-grid span { color: var(--subtle); font-size: 11px; }
+
+.impact-grid strong { font-size: 12px; font-weight: 600; line-height: 1.4; }
+
 .anatomy-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 
 .anatomy-grid > div { display: flex; flex-direction: column; gap: 4px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-soft); }
@@ -309,6 +357,8 @@ textarea:focus-visible, button:focus-visible, a:focus-visible { outline: 2px sol
 .footer a { color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
 
 @media (max-width: 860px) {
+  .lab-heading { align-items: flex-start; flex-direction: column; }
+  .lab-steps { justify-content: flex-start; }
   .workspace { grid-template-columns: 1fr; }
   .analysis-panel { min-height: auto; }
 }
@@ -317,6 +367,8 @@ textarea:focus-visible, button:focus-visible, a:focus-visible { outline: 2px sol
   .container { width: min(100% - 24px, 1160px); }
   .topbar { min-height: 64px; }
   .hero { padding: 48px 0 32px; }
+  .lab-section { padding-bottom: 32px; }
+  .lab-grid { grid-template-columns: 1fr; gap: 12px; }
   .workspace { gap: 12px; }
   .panel-header { display: block; }
   .mode-switch { margin-top: 16px; }
@@ -324,6 +376,7 @@ textarea:focus-visible, button:focus-visible, a:focus-visible { outline: 2px sol
   .sample-row { order: 2; }
   .primary-button { width: 100%; }
   .finding-toolbar { align-items: flex-start; flex-direction: column; }
+  .impact-grid { grid-template-columns: 1fr; }
   .filter-list { width: 100%; overflow-x: auto; flex-wrap: nowrap; padding-bottom: 2px; }
   .filter-button { flex-shrink: 0; }
   .report-actions > * { width: 100%; }
