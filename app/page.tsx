@@ -7,11 +7,24 @@ import { buildRedactedFixture, buildReport, decodeFixture, encodeFixture, fixtur
 
 type Mode = "uri" | "address";
 type FindingFilter = "all" | "block" | "review" | "informational";
+type InputExample = { label: string; value: string };
 
-const samples = [
-  { label: "Shielded testnet", value: "zcash:ztestsapling10yy2ex5dcqkclhc7z7yrnjq2z6feyjad56ptwlfgmy77dmaqqrl9gyhprdx59qgmsnyfska2kez?amount=1" },
-  { label: "Transparent testnet", value: "zcash:tmEZhbWHTpdKMw5it8YDspUXSMGQyFwovpU?amount=1" },
-];
+const shieldedTestnet = "ztestsapling10yy2ex5dcqkclhc7z7yrnjq2z6feyjad56ptwlfgmy77dmaqqrl9gyhprdx59qgmsnyfska2kez";
+const transparentTestnet = "tmEZhbWHTpdKMw5it8YDspUXSMGQyFwovpU";
+const unifiedMainnet = "u1l8xunezsvhq8fgzfl7404m450nwnd76zshscn6nfys7vyz2ywyh4cc5daaq0c7q2su5lqfh23sp7fkf3kt27ve5948mzpfdvckzaect2jtte308mkwlycj2u0eac077wu70vqcetkxf";
+
+const examplesByMode: Record<Mode, InputExample[]> = {
+  uri: [
+    { label: "Shielded request", value: `zcash:${shieldedTestnet}?amount=1` },
+    { label: "Transparent request", value: `zcash:${transparentTestnet}?amount=1` },
+    { label: "Missing amount", value: `zcash:${shieldedTestnet}` },
+  ],
+  address: [
+    { label: "Shielded address", value: shieldedTestnet },
+    { label: "Transparent address", value: transparentTestnet },
+    { label: "Unified address", value: unifiedMainnet },
+  ],
+};
 
 const publicFixtures: Array<{ label: string; description: string; analysis: Analysis }> = [
   {
@@ -136,6 +149,12 @@ export default function HomePage() {
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     runAnalysis();
+  }
+
+  function runExample(example: InputExample, exampleMode: Mode) {
+    setMode(exampleMode);
+    setValue(example.value);
+    runAnalysis(example.value, exampleMode);
   }
 
   function chooseMode(nextMode: Mode) {
@@ -274,12 +293,16 @@ export default function HomePage() {
             <form className="input-area" onSubmit={submit}>
               <label className="field-label" htmlFor="analysis-input">{mode === "uri" ? "Payment request" : "Zcash address"}</label>
               <div className="input-wrap">
-              <textarea id="analysis-input" value={value} onChange={(event) => { setValue(event.target.value); setError(""); setIsFixture(false); }} placeholder={mode === "uri" ? "zcash:ztestsapling1...?amount=1" : "u1... or zs1..."} aria-describedby="analysis-help" spellCheck={false} autoCapitalize="none" />
+              <textarea id="analysis-input" value={value} onChange={(event) => { setValue(event.target.value); setError(""); setIsFixture(false); }} placeholder={mode === "uri" ? "zcash:<address>?amount=1" : "u1... / zs1... / t1..."} aria-describedby="analysis-help analysis-format" spellCheck={false} autoCapitalize="none" />
               </div>
-              <p id="analysis-help" className="input-help">Local policy and encoding-shape analysis only. Full checksum, receiver composition, and transaction verification stay in the wallet.</p>
+              <p id="analysis-help" className="input-help">{mode === "uri" ? "Paste a full ZIP-321 payment request, for example zcash:<address>?amount=1." : "Paste one Zcash address. Supported families include transparent, Sapling, and Unified addresses."}</p>
+              <div id="analysis-format" className="input-format"><span>Expected format</span><code>{mode === "uri" ? "zcash:<address>?amount=1" : "u1... / zs1... / ztestsapling... / t1... / tm..."}</code></div>
               <div className="form-actions">
-                <div className="sample-row" aria-label="Sample inputs">
-                  {samples.map((sample) => <button type="button" key={sample.label} className="sample-button" onClick={() => { setMode("uri"); setValue(sample.value); runAnalysis(sample.value, "uri"); }}>{sample.label}</button>)}
+                <div className="sample-group">
+                  <span className="sample-label">Try an example</span>
+                  <div className="sample-row" aria-label={`${mode === "uri" ? "Payment request" : "Address"} examples`}>
+                    {examplesByMode[mode].map((example) => <button type="button" key={example.label} className="sample-button" onClick={() => runExample(example, mode)}>{example.label}</button>)}
+                  </div>
                 </div>
                 <button type="submit" className="primary-button" disabled={isAnalyzing} aria-busy={isAnalyzing}>{isAnalyzing ? "Analyzing" : "Run review"}<ArrowUpRight size={16} aria-hidden="true" /></button>
               </div>

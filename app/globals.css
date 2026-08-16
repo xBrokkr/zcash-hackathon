@@ -120,7 +120,17 @@ textarea:focus-visible, button:focus-visible, a:focus-visible { outline: 2px sol
 
 .input-help { margin-top: 8px; color: var(--subtle); font-size: 12px; }
 
-.form-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; }
+.input-format { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-soft); }
+
+.input-format span { flex-shrink: 0; color: var(--subtle); font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+
+.input-format code { min-width: 0; overflow: hidden; color: var(--foreground); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+
+.form-actions { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-top: 16px; }
+
+.sample-group { display: grid; min-width: 0; gap: 6px; }
+
+.sample-label { color: var(--subtle); font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
 
 .sample-row { display: flex; flex-wrap: wrap; gap: 8px; }
 
@@ -188,10 +198,6 @@ textarea:focus-visible, button:focus-visible, a:focus-visible { outline: 2px sol
 
 .finding svg { margin-top: 2px; }
 
-.finding.pass { border-left: 3px solid var(--border-strong); }
-.finding.review { border-left: 3px dashed var(--muted); }
-.finding.block { border-left: 3px solid var(--foreground); }
-.finding.note { border-left: 3px dotted var(--subtle); }
 .finding svg { color: var(--foreground); }
 
 .finding-title { font-size: 13px; font-weight: 600; }
