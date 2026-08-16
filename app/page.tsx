@@ -110,6 +110,12 @@ export default function HomePage() {
   const [isFixture, setIsFixture] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const fixtureInputRef = useRef<HTMLInputElement>(null);
+  const analysisPanelRef = useRef<HTMLDivElement>(null);
+
+  function scrollToReview() {
+    const behavior: ScrollBehavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+    window.requestAnimationFrame(() => analysisPanelRef.current?.scrollIntoView({ behavior, block: "start" }));
+  }
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -124,6 +130,7 @@ export default function HomePage() {
       setAnalysis(fixture);
       setIsFixture(true);
       setFindingFilter("all");
+      scrollToReview();
     }, 0);
     return () => window.clearTimeout(timer);
   }, []);
@@ -181,6 +188,7 @@ export default function HomePage() {
     setChecklistState("Copy fixes");
     setReportState("Download fixture");
     setShareState("Share redacted fixture");
+    scrollToReview();
   }
 
   function importFixture(event: ChangeEvent<HTMLInputElement>) {
@@ -310,7 +318,7 @@ export default function HomePage() {
             </form>
           </div>
 
-          <div className="panel analysis-panel">
+          <div ref={analysisPanelRef} className="panel analysis-panel">
             <div className="panel-header"><div><h2 className="panel-title">Privacy review</h2><p className="panel-subtitle">Every finding includes a source and an action.</p></div><ScanLine size={20} color="var(--accent)" aria-hidden="true" /></div>
             {!analysis ? <div className="idle-state"><div><div className="idle-icon"><FileCheck2 size={22} aria-hidden="true" /></div><div className="idle-title">Nothing reviewed yet</div><p className="idle-copy">Paste an input or use a sample to see the policy gate, request anatomy, and next actions.</p></div></div> :
               <div className="analysis-body">
