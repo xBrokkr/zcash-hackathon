@@ -4,6 +4,7 @@ import { analyzeAddress, analyzeUri } from "../lib/analyzer";
 
 const shieldedTestnet = "ztestsapling10yy2ex5dcqkclhc7z7yrnjq2z6feyjad56ptwlfgmy77dmaqqrl9gyhprdx59qgmsnyfska2kez";
 const shieldedMainnet = "zs1z7rejlpsa98s2rrrfkwmaxu53e4ue0ulcrw0h4x5g8jl04tak0d3mm47vdtahatqrlkngh9sly";
+const transparentMainnet = "t1KRqwQhktLV4BjbNLiuH6pb3AMoszZKcQB";
 const transparentTestnet = "tmEZhbWHTpdKMw5it8YDspUXSMGQyFwovpU";
 
 test("passes a well-formed shielded ZIP-321 request through local policy", () => {
@@ -17,6 +18,21 @@ test("blocks a memo sent to a transparent receiver", () => {
   const result = analyzeUri(`zcash:${transparentTestnet}?amount=1&memo=VGVzdA`);
   assert.equal(result.gate, "block");
   assert.ok(result.findings.some((finding) => finding.id === "zip321.memo-transparent"));
+});
+
+test("validates transparent Base58Check addresses without changing their privacy gate", () => {
+  const mainnet = analyzeAddress(transparentMainnet);
+  assert.equal(mainnet.entries[0]?.validation, "checksum-valid");
+  assert.equal(mainnet.entries[0]?.network, "mainnet");
+
+  const valid = analyzeAddress(transparentTestnet);
+  assert.equal(valid.entries[0]?.validation, "checksum-valid");
+  assert.equal(valid.gate, "block");
+
+  const corrupted = `${transparentTestnet.slice(0, -1)}${transparentTestnet.endsWith("1") ? "2" : "1"}`;
+  const invalid = analyzeAddress(corrupted);
+  assert.equal(invalid.entries[0]?.validation, "invalid");
+  assert.equal(invalid.confidence, "format-error");
 });
 
 test("blocks duplicate parameters", () => {
