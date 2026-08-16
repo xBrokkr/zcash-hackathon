@@ -26,6 +26,10 @@ export interface FixtureRecord {
   detail: string;
 }
 
+export interface RemoteObservationTransport {
+  inspect(entry: PaymentEntry): Promise<Pick<AdapterObservation, "status" | "network" | "detail">>;
+}
+
 export interface AdapterEvaluation {
   adapterId: string;
   trustBoundary: "local-policy-authority";
@@ -51,6 +55,27 @@ export class FixtureChainAdapter implements ChainAdapter {
       network: entry.network,
       claim: "observation-only",
       detail: record?.detail ?? "No local fixture observation matched this payment entry.",
+    };
+  }
+}
+
+export class RemoteChainAdapter implements ChainAdapter {
+  readonly id = "remote-chain";
+  readonly trust = "remote-untrusted" as const;
+
+  constructor(readonly endpoint: string, private readonly transport: RemoteObservationTransport) {
+    const parsed = new URL(endpoint);
+    if (parsed.protocol !== "https:") throw new Error("Remote chain adapters require an HTTPS endpoint.");
+  }
+
+  async inspect(entry: PaymentEntry): Promise<AdapterObservation> {
+    const observation = await this.transport.inspect(entry);
+    return {
+      adapterId: this.id,
+      trust: this.trust,
+      ...observation,
+      entryIndex: entry.index,
+      claim: "observation-only",
     };
   }
 }

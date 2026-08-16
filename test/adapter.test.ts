@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { FixtureChainAdapter, evaluateWithAdapter } from "../adapters/chain";
+import { FixtureChainAdapter, RemoteChainAdapter, evaluateWithAdapter } from "../adapters/chain";
 import { analyzeUri } from "../packages/core/src/index";
 
 const shieldedTestnet = "ztestsapling10yy2ex5dcqkclhc7z7yrnjq2z6feyjad56ptwlfgmy77dmaqqrl9gyhprdx59qgmsnyfska2kez";
@@ -27,4 +27,16 @@ test("adapter failure cannot upgrade or replace a blocked local result", async (
   assert.equal(result.effectiveGate, "block");
   assert.equal(result.observations[0]?.status, "error");
   assert.match(result.observations[0]?.detail ?? "", /local policy remains/);
+});
+
+test("remote adapter requires HTTPS and remains observation-only", async () => {
+  const analysis = analyzeUri(`zcash:${shieldedTestnet}?amount=1`);
+  assert.throws(() => new RemoteChainAdapter("http://node.example", { inspect: async () => ({ status: "match", network: "testnet", detail: "unsafe" }) }), /HTTPS/);
+  const adapter = new RemoteChainAdapter("https://node.example", { inspect: async () => ({ status: "match", network: "testnet", detail: "Remote observation returned by injected transport." }) });
+  const result = await evaluateWithAdapter(analysis, adapter);
+
+  assert.equal(result.effectiveGate, result.localGate);
+  assert.equal(result.verification, "not-verified");
+  assert.equal(result.observations[0]?.trust, "remote-untrusted");
+  assert.equal(result.observations[0]?.claim, "observation-only");
 });
