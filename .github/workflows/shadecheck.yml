@@ -19,6 +19,8 @@ jobs:
         run: npm ci
       - name: Run analyzer tests
         run: npm test
+      - name: Check pass, review, and block fixtures
+        run: npm run fixture-check
       - name: Run lint
         run: npm run lint
       - name: Run CLI smoke check

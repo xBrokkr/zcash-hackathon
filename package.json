@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint .",
     "test": "tsx --test test/*.test.ts",
-    "shadecheck": "tsx bin/shadecheck.ts"
+    "shadecheck": "tsx bin/shadecheck.ts",
+    "fixture-check": "tsx scripts/check-fixtures.ts"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",

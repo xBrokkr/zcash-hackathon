@@ -318,7 +318,7 @@ export default function HomePage() {
         <section className="below-grid" aria-label="How ShadeCheck works">
           <article className="panel info-card"><h2><ScanLine size={17} aria-hidden="true" />Parse the request</h2><p>Read ZIP-321 addresses, amounts, memos, assets, and indexed payments without sending input to a server.</p></article>
           <article className="panel info-card"><h2><ShieldCheck size={17} aria-hidden="true" />Explain exposure</h2><p>Separate transparent, shielded-capable, mixed, unknown, and cross-network paths in language a product team can use.</p></article>
-          <article className="panel info-card"><h2><TerminalSquare size={17} aria-hidden="true" />Ship with confidence</h2><p>The next phase extracts these rules into a CLI and CI check for Zcash checkout integrations.</p></article>
+          <article className="panel info-card"><h2><TerminalSquare size={17} aria-hidden="true" />Ship with confidence</h2><p>The next phase keeps any chain-aware adapters opt-in and separate from local policy rules.</p></article>
         </section>
 
         <section className="fixture-section" aria-labelledby="fixture-heading">
