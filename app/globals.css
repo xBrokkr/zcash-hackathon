@@ -242,21 +242,31 @@ textarea:focus-visible, button:focus-visible, a:focus-visible { outline: 2px sol
 
 .filter-list { display: flex; flex-wrap: wrap; gap: 6px; }
 
-.filter-button { padding: 0 10px; border-color: var(--border); background: transparent; color: var(--muted); font-size: 11px; }
+.filter-button { display: inline-flex; align-items: center; gap: 7px; padding: 0 10px; border-color: var(--border); background: transparent; color: var(--muted); font-size: 11px; }
 
 .filter-button[aria-pressed="true"] { border-color: var(--border-strong); background: var(--surface-raised); color: var(--foreground); }
 
 .filter-button:hover { border-color: var(--border-strong); color: var(--foreground); }
 
+.filter-button:disabled { cursor: not-allowed; border-style: dashed; color: var(--subtle); opacity: .65; }
+
+.filter-button:disabled:hover { border-color: var(--border); background: transparent; color: var(--subtle); }
+
+.filter-count { display: inline-flex; min-width: 17px; min-height: 17px; align-items: center; justify-content: center; padding: 0 4px; border: 1px solid var(--border); border-radius: 999px; color: inherit; font-size: 10px; line-height: 1; }
+
 .finding-count { flex-shrink: 0; color: var(--subtle); font-size: 11px; }
 
-.empty-findings { display: grid; gap: 8px; padding: 18px 12px; border: 1px dashed var(--border-strong); border-radius: var(--radius); background: var(--surface-soft); text-align: center; }
+.empty-findings { display: flex; align-items: flex-start; justify-content: center; gap: 8px; padding: 18px 12px; border: 1px dashed var(--border-strong); border-radius: var(--radius); background: var(--surface-soft); text-align: left; }
 
 .empty-title { font-size: 13px; font-weight: 600; }
 
 .empty-findings p { color: var(--muted); font-size: 12px; }
 
-.empty-findings .secondary-button { justify-self: center; }
+.empty-findings > svg, .filter-empty > svg { flex-shrink: 0; margin-top: 2px; color: var(--foreground); }
+
+.filter-empty { display: flex; align-items: flex-start; gap: 8px; margin-top: 8px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius); color: var(--muted); font-size: 12px; }
+
+.filter-reset { min-height: 0; border: 0; padding: 0; background: transparent; color: var(--foreground); font: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
 
 .confidence-note, .ignored-note { display: flex; gap: 8px; margin-top: 16px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius); color: var(--muted); font-size: 12px; }
 

@@ -355,6 +355,12 @@ export default function HomePage() {
     { value: "review", label: "Review" },
     { value: "informational", label: "Pass / note" },
   ];
+  const findingCounts: Record<FindingFilter, number> = {
+    all: analysis?.findings.length ?? 0,
+    block: analysis?.findings.filter((item) => item.level === "block").length ?? 0,
+    review: analysis?.findings.filter((item) => item.level === "review").length ?? 0,
+    informational: analysis?.findings.filter((item) => item.level === "pass" || item.level === "note").length ?? 0,
+  };
 
   return (
     <div className="app-shell">
@@ -440,11 +446,11 @@ export default function HomePage() {
                 <div className="section-label">Findings</div>
                 <div className="finding-toolbar" aria-label="Finding filters">
                   <div className="filter-list">
-                    {findingFilters.map((filter) => <button type="button" key={filter.value} className="filter-button" aria-pressed={findingFilter === filter.value} onClick={() => setFindingFilter(filter.value)}>{filter.label}</button>)}
+                    {findingFilters.map((filter) => <button type="button" key={filter.value} className="filter-button" aria-pressed={findingFilter === filter.value} disabled={filter.value !== "all" && findingCounts[filter.value] === 0} onClick={() => setFindingFilter(filter.value)}>{filter.label}<span className="filter-count">{findingCounts[filter.value]}</span></button>)}
                   </div>
-                  <span className="finding-count" aria-live="polite">{visibleFindings.length} shown</span>
+                  <span className="finding-count" aria-live="polite">{visibleFindings.length} {visibleFindings.length === 1 ? "finding" : "findings"}</span>
                 </div>
-                {visibleFindings.length > 0 ? <div className="finding-list">{visibleFindings.map((item) => <div className={`finding ${item.level}`} key={`${item.id}-${item.scope ?? "global"}`}><FindingIcon level={item.level} /><div><div className="finding-title">{item.title}</div><div className="finding-detail">{item.detail}</div><div className="finding-fix"><strong>Next:</strong> {item.fix}</div><a className="finding-source" href={item.source} target="_blank" rel="noreferrer">Source <ArrowUpRight size={12} aria-hidden="true" /></a></div></div>)}</div> : <div className="empty-findings"><div className="empty-title">No findings in this filter</div><p>Choose All to see every local rule result.</p><button type="button" className="secondary-button" onClick={() => setFindingFilter("all")}>Show all findings</button></div>}
+                {visibleFindings.length > 0 ? <div className="finding-list">{visibleFindings.map((item) => <div className={`finding ${item.level}`} key={`${item.id}-${item.scope ?? "global"}`}><FindingIcon level={item.level} /><div><div className="finding-title">{item.title}</div><div className="finding-detail">{item.detail}</div><div className="finding-fix"><strong>Next:</strong> {item.fix}</div><a className="finding-source" href={item.source} target="_blank" rel="noreferrer">Source <ArrowUpRight size={12} aria-hidden="true" /></a></div></div>)}</div> : findingFilter === "all" ? <div className="empty-findings"><CheckCircle2 size={16} aria-hidden="true" /><div><div className="empty-title">Review complete</div><p>No policy findings were generated for this input.</p></div></div> : <div className="filter-empty"><CheckCircle2 size={16} aria-hidden="true" /><span>This view is clear. <button type="button" className="filter-reset" onClick={() => setFindingFilter("all")}>View all results</button></span></div>}
                 {analysis.ignoredParameters.length > 0 ? <div className="ignored-note"><Info size={15} aria-hidden="true" /><span>Ignored optional parameters: {analysis.ignoredParameters.join(", ")}</span></div> : null}
                 <div className="report-actions">{!isFixture ? <button type="button" className="secondary-button" onClick={copyRequest}><Copy size={15} aria-hidden="true" />{copyState}</button> : <span className="redacted-badge"><LockKeyhole size={14} aria-hidden="true" />Raw input redacted</span>}<button type="button" className="secondary-button" onClick={copyFixChecklist}><ClipboardList size={15} aria-hidden="true" />{checklistState}</button><button type="button" className="secondary-button" onClick={downloadReportArtifact}><Download size={15} aria-hidden="true" />{isFixture ? reportState.replace("report", "fixture") : reportState}</button><button type="button" className="secondary-button" onClick={shareRedactedFixture}><Link2 size={15} aria-hidden="true" />{shareState}</button></div>
                 <div className="report-note"><LockKeyhole size={15} aria-hidden="true" /><span>{isFixture ? "This is a redacted fixture. Addresses, amounts, and raw request text are not included." : "The report is generated locally. Downloaded reports include a SHA-256 input hash; ShadeCheck does not query the chain, sign a transaction, or broadcast funds."}</span></div>
