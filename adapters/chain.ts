@@ -66,10 +66,15 @@ export class RemoteChainAdapter implements ChainAdapter {
   constructor(readonly endpoint: string, private readonly transport: RemoteObservationTransport) {
     const parsed = new URL(endpoint);
     if (parsed.protocol !== "https:") throw new Error("Remote chain adapters require an HTTPS endpoint.");
+    if (parsed.username || parsed.password) throw new Error("Remote chain adapter endpoints must not contain embedded credentials.");
+    if (parsed.hash) throw new Error("Remote chain adapter endpoints must not contain a URL fragment.");
   }
 
   async inspect(entry: PaymentEntry): Promise<AdapterObservation> {
     const observation = await this.transport.inspect(entry);
+    if (observation.status === "match" && observation.network !== entry.network) {
+      throw new Error("Remote observation network does not match the payment entry.");
+    }
     return {
       adapterId: this.id,
       trust: this.trust,

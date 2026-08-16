@@ -32,6 +32,8 @@ test("adapter failure cannot upgrade or replace a blocked local result", async (
 test("remote adapter requires HTTPS and remains observation-only", async () => {
   const analysis = analyzeUri(`zcash:${shieldedTestnet}?amount=1`);
   assert.throws(() => new RemoteChainAdapter("http://node.example", { inspect: async () => ({ status: "match", network: "testnet", detail: "unsafe" }) }), /HTTPS/);
+  assert.throws(() => new RemoteChainAdapter("https://user:pass@node.example", { inspect: async () => ({ status: "not-found", network: "testnet", detail: "unsafe" }) }), /credentials/);
+  assert.throws(() => new RemoteChainAdapter("https://node.example/#fixture", { inspect: async () => ({ status: "not-found", network: "testnet", detail: "unsafe" }) }), /fragment/);
   const adapter = new RemoteChainAdapter("https://node.example", { inspect: async () => ({ status: "match", network: "testnet", detail: "Remote observation returned by injected transport." }) });
   const result = await evaluateWithAdapter(analysis, adapter);
 
@@ -39,4 +41,15 @@ test("remote adapter requires HTTPS and remains observation-only", async () => {
   assert.equal(result.verification, "not-verified");
   assert.equal(result.observations[0]?.trust, "remote-untrusted");
   assert.equal(result.observations[0]?.claim, "observation-only");
+});
+
+test("remote network mismatch fails closed without changing the local gate", async () => {
+  const analysis = analyzeUri(`zcash:${shieldedTestnet}?amount=1`);
+  const adapter = new RemoteChainAdapter("https://node.example", { inspect: async () => ({ status: "match", network: "mainnet", detail: "wrong network" }) });
+  const result = await evaluateWithAdapter(analysis, adapter);
+
+  assert.equal(result.localGate, "pass");
+  assert.equal(result.effectiveGate, "pass");
+  assert.equal(result.observations[0]?.status, "error");
+  assert.match(result.observations[0]?.detail ?? "", /local policy remains/);
 });
