@@ -135,7 +135,7 @@ export default function HomePage() {
     return () => window.clearTimeout(timer);
   }, []);
 
-  function runAnalysis(nextValue = value, nextMode = mode) {
+  function runAnalysis(nextValue = value, nextMode = mode, shouldScroll = false) {
     setError("");
     if (!nextValue.trim()) {
       setAnalysis(null);
@@ -150,6 +150,7 @@ export default function HomePage() {
     window.setTimeout(() => {
       setAnalysis(nextMode === "uri" ? analyzeUri(nextValue) : analyzeAddress(nextValue));
       setIsAnalyzing(false);
+      if (shouldScroll) scrollToReview();
     }, 160);
   }
 
@@ -161,7 +162,7 @@ export default function HomePage() {
   function runExample(example: InputExample, exampleMode: Mode) {
     setMode(exampleMode);
     setValue(example.value);
-    runAnalysis(example.value, exampleMode);
+    runAnalysis(example.value, exampleMode, true);
   }
 
   function chooseMode(nextMode: Mode) {
@@ -303,11 +304,11 @@ export default function HomePage() {
               <div className="input-wrap">
               <textarea id="analysis-input" value={value} onChange={(event) => { setValue(event.target.value); setError(""); setIsFixture(false); }} placeholder={mode === "uri" ? "zcash:<address>?amount=1" : "u1... / zs1... / t1..."} aria-describedby="analysis-help analysis-format" spellCheck={false} autoCapitalize="none" />
               </div>
-              <p id="analysis-help" className="input-help">{mode === "uri" ? "Paste a full ZIP-321 payment request, for example zcash:<address>?amount=1." : "Paste one Zcash address. Supported families include transparent, Sapling, and Unified addresses."}</p>
+              <p id="analysis-help" className="input-help">{mode === "uri" ? "Paste a complete ZIP-321 payment request, including the zcash: prefix, address, and amount. Use the examples below if you are unsure what belongs here." : "Paste one Zcash address, such as a shielded, transparent, or Unified address. Use the examples below to compare the supported formats."}</p>
               <div id="analysis-format" className="input-format"><span>Expected format</span><code>{mode === "uri" ? "zcash:<address>?amount=1" : "u1... / zs1... / ztestsapling... / t1... / tm..."}</code></div>
               <div className="form-actions">
                 <div className="sample-group">
-                  <span className="sample-label">Try an example</span>
+                  <span className="sample-label">Use a starting example</span>
                   <div className="sample-row" aria-label={`${mode === "uri" ? "Payment request" : "Address"} examples`}>
                     {examplesByMode[mode].map((example) => <button type="button" key={example.label} className="sample-button" onClick={() => runExample(example, mode)}>{example.label}</button>)}
                   </div>
