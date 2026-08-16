@@ -23,5 +23,7 @@ jobs:
         run: npm run fixture-check
       - name: Run lint
         run: npm run lint
+      - name: Verify production build
+        run: npm run build
       - name: Run CLI smoke check
         run: printf '%s' 'zcash:ztestsapling10yy2ex5dcqkclhc7z7yrnjq2z6feyjad56ptwlfgmy77dmaqqrl9gyhprdx59qgmsnyfska2kez?amount=1' | npm run shadecheck -- --mode uri
