@@ -93,12 +93,14 @@ function classifyAddress(address: string): { classification: AddressClass; netwo
     const data = lower.slice("ztestsapling1".length);
     return { classification: "shielded", network: "testnet", validation: data.length > 6 && BECH32_DATA.test(data) ? "shape-only" : "invalid" };
   }
-  if (lower.startsWith("u1")) {
-    const data = lower.slice(2);
+  const unifiedMainnetPrefix = ["u1", "zu1", "tu1"].find((prefix) => lower.startsWith(prefix));
+  if (unifiedMainnetPrefix) {
+    const data = lower.slice(unifiedMainnetPrefix.length);
     return { classification: "unified", network: "mainnet", validation: data.length > 6 && BECH32_DATA.test(data) ? "shape-only" : "invalid" };
   }
-  if (lower.startsWith("utest1")) {
-    const data = lower.slice("utest1".length);
+  const unifiedTestnetPrefix = ["utest1", "zutest1", "tutest1"].find((prefix) => lower.startsWith(prefix));
+  if (unifiedTestnetPrefix) {
+    const data = lower.slice(unifiedTestnetPrefix.length);
     return { classification: "unified", network: "testnet", validation: data.length > 6 && BECH32_DATA.test(data) ? "shape-only" : "invalid" };
   }
   return { classification: "unknown", network: "unknown", validation: "invalid" };
@@ -113,6 +115,19 @@ function decodeBase64Url(value: string): Uint8Array | null {
   } catch {
     return null;
   }
+}
+
+function isQchar(value: string): boolean {
+  for (let index = 0; index < value.length; index += 1) {
+    const character = value[index] ?? "";
+    if (/^[A-Za-z0-9\-._~!$'()*+,;:@]$/.test(character)) continue;
+    if (character === "%" && /^[0-9A-Fa-f]{2}$/.test(value.slice(index + 1, index + 3))) {
+      index += 2;
+      continue;
+    }
+    return false;
+  }
+  return true;
 }
 
 function amountIsValid(value: string): boolean {
@@ -190,12 +205,12 @@ export function analyzeUri(input: string): Analysis {
   if (rawQuery) {
     for (const rawPair of rawQuery.split("&")) {
       const equals = rawPair.indexOf("=");
-      if (equals < 1) {
-        findings.push(finding("zip321.parameter", `The query item ${rawPair || "<empty>"} is not a key=value pair.`));
+      const key = equals === -1 ? rawPair : rawPair.slice(0, equals);
+      const rawValue = equals === -1 ? "" : rawPair.slice(equals + 1);
+      if (key.length === 0) {
+        findings.push(finding("zip321.parameter", `The query item ${rawPair || "<empty>"} does not have a parameter name.`));
         continue;
       }
-      const key = rawPair.slice(0, equals);
-      const rawValue = rawPair.slice(equals + 1);
       if (key.includes("%") || seenKeys.has(key)) {
         findings.push(finding(seenKeys.has(key) ? "zip321.duplicate" : "zip321.parameter", `The parameter ${key} is repeated or percent-encoded in a position where ZIP-321 forbids it.`));
         continue;
@@ -213,9 +228,17 @@ export function analyzeUri(input: string): Analysis {
         findings.push(finding("zip321.index", `The parameter ${key} uses a forbidden index.`));
         continue;
       }
+      if (!isQchar(rawValue)) {
+        findings.push(finding("zip321.parameter", `${key} contains characters outside the ZIP-321 qchar grammar.`));
+        continue;
+      }
       if (!parsedKey) {
         if (name.startsWith("req-")) findings.push(finding("zip321.required", `${name} is required by forward compatibility and is not supported by this analyzer.`));
         else ignoredParameters.push(key);
+        continue;
+      }
+      if (equals === -1) {
+        findings.push(finding("zip321.parameter", `The recognized parameter ${key} must use key=value syntax.`));
         continue;
       }
       if (head && name === "address" && index === "") {

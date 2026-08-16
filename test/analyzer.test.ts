@@ -55,6 +55,33 @@ test("blocks unknown required parameters", () => {
   assert.equal(result.gate, "block");
 });
 
+test("accepts optional unknown parameters without an equals sign but blocks required ones", () => {
+  const optional = analyzeUri(`zcash:${shieldedTestnet}?future-flag&amount=1`);
+  assert.equal(optional.gate, "pass");
+  assert.deepEqual(optional.ignoredParameters, ["future-flag"]);
+
+  const required = analyzeUri(`zcash:${shieldedTestnet}?req-future&amount=1`);
+  assert.ok(required.findings.some((finding) => finding.id === "zip321.required"));
+  assert.equal(required.gate, "block");
+
+  const recognized = analyzeUri(`zcash:${shieldedTestnet}?amount&amount=1`);
+  assert.ok(recognized.findings.some((finding) => finding.id === "zip321.parameter"));
+  assert.equal(recognized.gate, "block");
+});
+
+test("enforces ZIP-321 qchar syntax for descriptive and unknown parameter values", () => {
+  const valid = analyzeUri(`zcash:${shieldedTestnet}?amount=1&label=hello%20world&future=alpha%3Abeta`);
+  assert.equal(valid.gate, "pass");
+
+  const invalidLabel = analyzeUri(`zcash:${shieldedTestnet}?amount=1&label=hello world`);
+  assert.ok(invalidLabel.findings.some((finding) => finding.id === "zip321.parameter"));
+  assert.equal(invalidLabel.gate, "block");
+
+  const invalidUnknown = analyzeUri(`zcash:${shieldedTestnet}?amount=1&future=bad%2G`);
+  assert.ok(invalidUnknown.findings.some((finding) => finding.id === "zip321.parameter"));
+  assert.equal(invalidUnknown.gate, "block");
+});
+
 test("blocks mixed networks", () => {
   const result = analyzeUri(`zcash:?address=${transparentTestnet}&amount=1&address.1=${shieldedMainnet}&amount.1=1`);
   assert.ok(result.findings.some((finding) => finding.id === "zip321.network"));
@@ -72,4 +99,20 @@ test("does not treat an arbitrary u1 prefix as a verified address", () => {
   const result = analyzeAddress("u1not-a-real-address");
   assert.equal(result.gate, "block");
   assert.equal(result.confidence, "format-error");
+});
+
+test("recognizes current Unified Address revision prefixes without claiming checksum verification", () => {
+  for (const [address, network] of [
+    ["zu1qqqqqqqqqqq", "mainnet"],
+    ["zutest1qqqqqqqqqqq", "testnet"],
+    ["tu1qqqqqqqqqqq", "mainnet"],
+    ["tutest1qqqqqqqqqqq", "testnet"],
+  ] as const) {
+    const result = analyzeAddress(address);
+    assert.equal(result.entries[0]?.classification, "unified");
+    assert.equal(result.entries[0]?.network, network);
+    assert.equal(result.confidence, "shape-only");
+    assert.ok(result.findings.some((finding) => finding.id === "address.shape"));
+    assert.equal(result.findings.some((finding) => finding.id === "address.unknown"), false);
+  }
 });
