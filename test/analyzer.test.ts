@@ -6,6 +6,9 @@ const shieldedTestnet = "ztestsapling10yy2ex5dcqkclhc7z7yrnjq2z6feyjad56ptwlfgmy
 const shieldedMainnet = "zs1z7rejlpsa98s2rrrfkwmaxu53e4ue0ulcrw0h4x5g8jl04tak0d3mm47vdtahatqrlkngh9sly";
 const transparentMainnet = "t1KRqwQhktLV4BjbNLiuH6pb3AMoszZKcQB";
 const transparentTestnet = "tmEZhbWHTpdKMw5it8YDspUXSMGQyFwovpU";
+const orchardUnifiedTestnet = "utest1s9tgkxz3facm5lakztmrm7g062wxvq7kdd93w23kmr368h90wxjrc0la8cxwzfummn2wd2q3ql6t3nt77s5r3n3uflj8kz2e2sz5yrtk";
+const saplingOnlyUnifiedTestnet = "utest13t9wxc5sj3farqc46msv556ntqdvuvld4xc9y0e8kl4nv3p7f7rd5ehddkyncc8f7alfcekj97p54yv4y40wyw53adxupcvnzyqyd6kc";
+const validAsset = "AEcnAAAAAAAAAADerb7v3q2-796tvu_erb7v3q2-796tvu_erb7v3q2-7xEiM0RVZneImQCqu8zd7v8AESIzRFVmd4iZqrvM3e7_";
 
 test("passes a well-formed shielded ZIP-321 request through local policy", () => {
   const result = analyzeUri(`zcash:${shieldedTestnet}?amount=1`);
@@ -63,6 +66,16 @@ test("blocks amount and custom asset collisions", () => {
   const result = analyzeUri(`zcash:${shieldedTestnet}?amount=1&req-asset=bad`);
   assert.ok(result.findings.some((finding) => finding.id === "zip321.amount-asset"));
   assert.equal(result.gate, "block");
+});
+
+test("requires a locally decoded Orchard receiver for custom assets", () => {
+  const orchard = analyzeUri(`zcash:${orchardUnifiedTestnet}?req-asset=${validAsset}`);
+  assert.equal(orchard.gate, "pass");
+  assert.equal(orchard.findings.some((finding) => finding.id === "zip321.asset"), false);
+
+  const saplingOnly = analyzeUri(`zcash:${saplingOnlyUnifiedTestnet}?req-asset=${validAsset}`);
+  assert.equal(saplingOnly.gate, "block");
+  assert.ok(saplingOnly.findings.some((finding) => finding.id === "zip321.asset"));
 });
 
 test("blocks unknown required parameters", () => {

@@ -12,6 +12,7 @@
     "fixture-check": "tsx scripts/check-fixtures.ts"
   },
   "dependencies": {
+    "blakejs": "^1.2.1",
     "lucide-react": "^0.468.0",
     "next": "^16.3.1",
     "react": "^19.2.8",

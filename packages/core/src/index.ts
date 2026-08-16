@@ -1,3 +1,5 @@
+import { blake2b as blake2bImplementation } from "blakejs";
+
 export type FindingLevel = "block" | "review" | "note" | "pass";
 export type AnalysisGate = "pass" | "review" | "block";
 export type AddressValidation = "shape-only" | "checksum-valid" | "invalid";
@@ -22,7 +24,7 @@ export const RULES = {
   "zip321.amount": { title: "Invalid payment amount", level: "block", source: "https://zips.z.cash/zip-0321#zec-transfer-amount", fix: "Use a positive decimal with at most eight fractional digits and no more than 21,000,000 ZEC." },
   "zip321.amount-missing": { title: "Payment amount is missing", level: "review", source: "https://zips.z.cash/zip-0321#query-keys", fix: "Include an amount so the wallet does not require manual re-entry." },
   "zip321.amount-asset": { title: "Amount and asset are combined", level: "block", source: "https://zips.z.cash/zip-0321#custom-assets", fix: "Use amount for ZEC or req-asset for a custom asset, never both at one index." },
-  "zip321.asset": { title: "Invalid custom asset request", level: "block", source: "https://zips.z.cash/zip-0321#custom-assets", fix: "Use an unpadded base64url version-0 asset payload with 75 decoded bytes." },
+  "zip321.asset": { title: "Invalid custom asset request", level: "block", source: "https://zips.z.cash/zip-0321#custom-assets", fix: "Use an unpadded base64url version-0 asset payload with 75 decoded bytes and a Unified Address containing an Orchard receiver." },
   "zip321.memo": { title: "Invalid memo encoding", level: "block", source: "https://zips.z.cash/zip-0321#query-keys", fix: "Use unpadded base64url and keep the decoded memo at or below 512 bytes." },
   "zip321.memo-transparent": { title: "Memo targets a transparent address", level: "block", source: "https://zips.z.cash/zip-0321#query-keys", fix: "Remove the memo or change the payment to a shielded-capable address." },
   "zip321.network": { title: "Network mismatch", level: "block", source: "https://zips.z.cash/zip-0321#uri-semantics", fix: "Use only mainnet addresses or only testnet addresses in one request." },
@@ -86,6 +88,11 @@ const SHA256_K = [
   0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
   0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
 ];
+const BLAKE2B_WITH_PERSONAL = blake2bImplementation as unknown as (input: Uint8Array, key?: Uint8Array, outlen?: number, salt?: Uint8Array, personal?: Uint8Array) => Uint8Array;
+const F4JUMBLE_H_PREFIX = new TextEncoder().encode("UA_F4Jumble_H");
+const F4JUMBLE_G_PREFIX = new TextEncoder().encode("UA_F4Jumble_G");
+const UNIFIED_MAINNET_HRPS = ["u", "zu", "tu"];
+const UNIFIED_TESTNET_HRPS = ["utest", "zutest", "tutest"];
 
 function finding(id: RuleId, detail: string, scope?: string): Finding {
   const rule = RULES[id];
@@ -223,6 +230,105 @@ function decodeBech32Payload(address: string, expectedHrp: string, variant: numb
   return convertBits(values.slice(0, -6), 5, 8);
 }
 
+function unifiedHrpForAddress(address: string): string | null {
+  const lower = address.toLowerCase();
+  return [...UNIFIED_MAINNET_HRPS, ...UNIFIED_TESTNET_HRPS].find((hrp) => lower.startsWith(`${hrp}1`)) ?? null;
+}
+
+function f4Personalization(prefix: Uint8Array, round: number, block = 0): Uint8Array {
+  const personalization = new Uint8Array(16);
+  personalization.set(prefix);
+  personalization[13] = round;
+  personalization[14] = block & 0xff;
+  personalization[15] = (block >>> 8) & 0xff;
+  return personalization;
+}
+
+function xorBytes(left: Uint8Array, right: Uint8Array): Uint8Array {
+  const output = new Uint8Array(left.length);
+  for (let index = 0; index < left.length; index += 1) output[index] = (left[index] ?? 0) ^ (right[index] ?? 0);
+  return output;
+}
+
+function f4HashH(round: number, input: Uint8Array, outputLength: number): Uint8Array {
+  return BLAKE2B_WITH_PERSONAL(input, undefined, outputLength, undefined, f4Personalization(F4JUMBLE_H_PREFIX, round));
+}
+
+function f4HashG(round: number, input: Uint8Array, outputLength: number): Uint8Array {
+  const output = new Uint8Array(outputLength);
+  let offset = 0;
+  for (let block = 0; offset < outputLength; block += 1) {
+    const digest = BLAKE2B_WITH_PERSONAL(input, undefined, 64, undefined, f4Personalization(F4JUMBLE_G_PREFIX, round, block));
+    const length = Math.min(digest.length, outputLength - offset);
+    output.set(digest.slice(0, length), offset);
+    offset += length;
+  }
+  return output;
+}
+
+function f4JumbleInverse(input: Uint8Array): Uint8Array | null {
+  if (input.length < 38 || input.length > 4_194_368) return null;
+  const leftLength = Math.min(64, Math.floor(input.length / 2));
+  const rightLength = input.length - leftLength;
+  const c = input.slice(0, leftLength);
+  const d = input.slice(leftLength);
+  const y = xorBytes(c, f4HashH(1, d, leftLength));
+  const x = xorBytes(d, f4HashG(1, y, rightLength));
+  const a = xorBytes(y, f4HashH(0, x, leftLength));
+  const b = xorBytes(x, f4HashG(0, a, rightLength));
+  const output = new Uint8Array(input.length);
+  output.set(a, 0);
+  output.set(b, leftLength);
+  return output;
+}
+
+function readCompactSize(bytes: Uint8Array, offset: number): { value: number; next: number } | null {
+  const marker = bytes[offset];
+  if (marker === undefined) return null;
+  if (marker < 253) return { value: marker, next: offset + 1 };
+  const width = marker === 253 ? 2 : marker === 254 ? 4 : 8;
+  if (offset + 1 + width > bytes.length) return null;
+  let value = 0;
+  for (let index = 0; index < width; index += 1) {
+    value += (bytes[offset + 1 + index] ?? 0) * 2 ** (8 * index);
+    if (!Number.isSafeInteger(value)) return null;
+  }
+  return { value, next: offset + 1 + width };
+}
+
+function decodeUnifiedReceiverTypes(address: string): Set<number> | null {
+  const hrp = unifiedHrpForAddress(address);
+  if (!hrp) return null;
+  const jumbled = decodeBech32Payload(address, hrp, 0x2bc830a3);
+  if (!jumbled) return null;
+  const raw = f4JumbleInverse(jumbled);
+  if (!raw || raw.length < 16) return null;
+  const padding = new Uint8Array(16);
+  padding.set(new TextEncoder().encode(hrp));
+  const paddingStart = raw.length - 16;
+  if (padding.some((value, index) => raw[paddingStart + index] !== value)) return null;
+
+  const receivers = new Set<number>();
+  let offset = 0;
+  let previousType = -1;
+  const end = raw.length - 16;
+  while (offset < end) {
+    const type = readCompactSize(raw, offset);
+    if (!type || type.value > 0x2000000 || type.value <= previousType) return null;
+    const length = readCompactSize(raw, type.next);
+    if (!length || length.value > 0x2000000 || length.next + length.value > end) return null;
+    if ((type.value === 0 || type.value === 1) && length.value !== 20) return null;
+    if ((type.value === 2 || type.value === 3) && length.value !== 43) return null;
+    receivers.add(type.value);
+    previousType = type.value;
+    offset = length.next + length.value;
+  }
+  if (receivers.size === 0) return null;
+  if ((hrp === "zu" || hrp === "zutest") && (receivers.has(0) || receivers.has(1))) return null;
+  if ((hrp === "u" || hrp === "utest") && ![...receivers].some((type) => type === 2 || type === 3)) return null;
+  return receivers;
+}
+
 function classifyAddress(address: string): { classification: AddressClass; network: Network; validation: AddressValidation } {
   const value = address.trim();
   const lower = value.toLowerCase();
@@ -236,14 +342,14 @@ function classifyAddress(address: string): { classification: AddressClass; netwo
     const payload = decodeBech32Payload(value, "ztestsapling", 1);
     return { classification: "shielded", network: "testnet", validation: payload?.length === 43 ? "checksum-valid" : "invalid" };
   }
-  const unifiedMainnetPrefix = ["u1", "zu1", "tu1"].find((prefix) => lower.startsWith(prefix));
-  if (unifiedMainnetPrefix) {
-    const payload = decodeBech32Payload(value, unifiedMainnetPrefix.slice(0, -1), 0x2bc830a3);
+  const unifiedMainnetHrp = UNIFIED_MAINNET_HRPS.find((hrp) => lower.startsWith(`${hrp}1`));
+  if (unifiedMainnetHrp) {
+    const payload = decodeBech32Payload(value, unifiedMainnetHrp, 0x2bc830a3);
     return { classification: "unified", network: "mainnet", validation: payload && payload.length >= 16 ? "checksum-valid" : "invalid" };
   }
-  const unifiedTestnetPrefix = ["utest1", "zutest1", "tutest1"].find((prefix) => lower.startsWith(prefix));
-  if (unifiedTestnetPrefix) {
-    const payload = decodeBech32Payload(value, unifiedTestnetPrefix.slice(0, -1), 0x2bc830a3);
+  const unifiedTestnetHrp = UNIFIED_TESTNET_HRPS.find((hrp) => lower.startsWith(`${hrp}1`));
+  if (unifiedTestnetHrp) {
+    const payload = decodeBech32Payload(value, unifiedTestnetHrp, 0x2bc830a3);
     return { classification: "unified", network: "testnet", validation: payload && payload.length >= 16 ? "checksum-valid" : "invalid" };
   }
   return { classification: "unknown", network: "unknown", validation: "invalid" };
@@ -423,6 +529,7 @@ export function analyzeUri(input: string): Analysis {
       const assetBytes = decodeBase64Url(payment.asset ?? "");
       if (!assetBytes || assetBytes.length !== 75 || assetBytes[0] !== 0) findings.push(finding("zip321.asset", `Payment ${index || "0"} does not contain a valid version-0 asset payload.`, index || "0"));
       if (classified.classification !== "unified") findings.push(finding("zip321.asset", `Payment ${index || "0"} requests a custom asset without a Unified Address receiver.`, index || "0"));
+      if (classified.classification === "unified" && !decodeUnifiedReceiverTypes(payment.address)?.has(3)) findings.push(finding("zip321.asset", `Payment ${index || "0"} uses a Unified Address whose Orchard receiver cannot be proven locally.`, index || "0"));
     }
     if (payment.memoPresent) {
       const memoBytes = decodeBase64Url(payment.memo ?? "");
