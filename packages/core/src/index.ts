@@ -267,7 +267,7 @@ function f4HashG(round: number, input: Uint8Array, outputLength: number): Uint8A
 }
 
 function f4JumbleInverse(input: Uint8Array): Uint8Array | null {
-  if (input.length < 38 || input.length > 4_194_368) return null;
+  if (input.length < 48 || input.length > 4_194_368) return null;
   const leftLength = Math.min(64, Math.floor(input.length / 2));
   const rightLength = input.length - leftLength;
   const c = input.slice(0, leftLength);

@@ -6,8 +6,8 @@ const shieldedTestnet = "ztestsapling10yy2ex5dcqkclhc7z7yrnjq2z6feyjad56ptwlfgmy
 const shieldedMainnet = "zs1z7rejlpsa98s2rrrfkwmaxu53e4ue0ulcrw0h4x5g8jl04tak0d3mm47vdtahatqrlkngh9sly";
 const transparentMainnet = "t1KRqwQhktLV4BjbNLiuH6pb3AMoszZKcQB";
 const transparentTestnet = "tmEZhbWHTpdKMw5it8YDspUXSMGQyFwovpU";
-const orchardUnifiedTestnet = "utest1s9tgkxz3facm5lakztmrm7g062wxvq7kdd93w23kmr368h90wxjrc0la8cxwzfummn2wd2q3ql6t3nt77s5r3n3uflj8kz2e2sz5yrtk";
-const saplingOnlyUnifiedTestnet = "utest13t9wxc5sj3farqc46msv556ntqdvuvld4xc9y0e8kl4nv3p7f7rd5ehddkyncc8f7alfcekj97p54yv4y40wyw53adxupcvnzyqyd6kc";
+const orchardUnifiedMainnet = "u1pg2aaph7jp8rpf6yhsza25722sg5fcn3vaca6ze27hqjw7jvvhhuxkpcg0ge9xh6drsgdkda8qjq5chpehkcpxf87rnjryjqwymdheptpvnljqqrjqzjwkc2ma6hcq666kgwfytxwac8eyex6ndgr6ezte66706e3vaqrd25dzvzkc69kw0jgywtd0cmq52q5lkw6uh7hyvzjse8ksx";
+const saplingOnlyUnifiedMainnet = "u1l8xunezsvhq8fgzfl7404m450nwnd76zshscn6nfys7vyz2ywyh4cc5daaq0c7q2su5lqfh23sp7fkf3kt27ve5948mzpfdvckzaect2jtte308mkwlycj2u0eac077wu70vqcetkxf";
 const validAsset = "AEcnAAAAAAAAAADerb7v3q2-796tvu_erb7v3q2-796tvu_erb7v3q2-7xEiM0RVZneImQCqu8zd7v8AESIzRFVmd4iZqrvM3e7_";
 
 test("passes a well-formed shielded ZIP-321 request through local policy", () => {
@@ -69,11 +69,11 @@ test("blocks amount and custom asset collisions", () => {
 });
 
 test("requires a locally decoded Orchard receiver for custom assets", () => {
-  const orchard = analyzeUri(`zcash:${orchardUnifiedTestnet}?req-asset=${validAsset}`);
+  const orchard = analyzeUri(`zcash:${orchardUnifiedMainnet}?req-asset=${validAsset}`);
   assert.equal(orchard.gate, "pass");
   assert.equal(orchard.findings.some((finding) => finding.id === "zip321.asset"), false);
 
-  const saplingOnly = analyzeUri(`zcash:${saplingOnlyUnifiedTestnet}?req-asset=${validAsset}`);
+  const saplingOnly = analyzeUri(`zcash:${saplingOnlyUnifiedMainnet}?req-asset=${validAsset}`);
   assert.equal(saplingOnly.gate, "block");
   assert.ok(saplingOnly.findings.some((finding) => finding.id === "zip321.asset"));
 });
