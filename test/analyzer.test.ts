@@ -92,6 +92,7 @@ test("labels direct shielded address checks as shape-only", () => {
   const result = analyzeAddress(shieldedTestnet);
   assert.equal(result.gate, "pass");
   assert.equal(result.confidence, "shape-only");
+  assert.equal(result.entries[0]?.validation, "checksum-valid");
   assert.ok(result.findings.some((finding) => finding.id === "address.shape"));
 });
 
@@ -103,16 +104,30 @@ test("does not treat an arbitrary u1 prefix as a verified address", () => {
 
 test("recognizes current Unified Address revision prefixes without claiming checksum verification", () => {
   for (const [address, network] of [
-    ["zu1qqqqqqqqqqq", "mainnet"],
-    ["zutest1qqqqqqqqqqq", "testnet"],
-    ["tu1qqqqqqqqqqq", "mainnet"],
-    ["tutest1qqqqqqqqqqq", "testnet"],
+    ["zu1qypqxpq9qcrsszg2pvxq6rs0zqg3yyc5z5tpwxqv4d6g9", "mainnet"],
+    ["zutest1qypqxpq9qcrsszg2pvxq6rs0zqg3yyc5z5tpwxqdqwec3", "testnet"],
+    ["tu1qypqxpq9qcrsszg2pvxq6rs0zqg3yyc5z5tpwxqa2c2lp", "mainnet"],
+    ["tutest1qypqxpq9qcrsszg2pvxq6rs0zqg3yyc5z5tpwxqlxup9h", "testnet"],
   ] as const) {
     const result = analyzeAddress(address);
     assert.equal(result.entries[0]?.classification, "unified");
     assert.equal(result.entries[0]?.network, network);
+    assert.equal(result.entries[0]?.validation, "checksum-valid");
     assert.equal(result.confidence, "shape-only");
     assert.ok(result.findings.some((finding) => finding.id === "address.shape"));
     assert.equal(result.findings.some((finding) => finding.id === "address.unknown"), false);
   }
+});
+
+test("rejects Bech32 and Bech32m checksum mutations", () => {
+  const validUnified = "zu1qypqxpq9qcrsszg2pvxq6rs0zqg3yyc5z5tpwxqv4d6g9";
+  const invalidUnified = `${validUnified.slice(0, -1)}${validUnified.endsWith("q") ? "p" : "q"}`;
+  const unifiedResult = analyzeAddress(invalidUnified);
+  assert.equal(unifiedResult.entries[0]?.validation, "invalid");
+  assert.equal(unifiedResult.confidence, "format-error");
+
+  const invalidSapling = `${shieldedTestnet.slice(0, -1)}${shieldedTestnet.endsWith("q") ? "p" : "q"}`;
+  const saplingResult = analyzeAddress(invalidSapling);
+  assert.equal(saplingResult.entries[0]?.validation, "invalid");
+  assert.equal(saplingResult.confidence, "format-error");
 });

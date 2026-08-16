@@ -292,7 +292,7 @@ export default function HomePage() {
             {!analysis ? <div className="idle-state"><div><div className="idle-icon"><FileCheck2 size={22} aria-hidden="true" /></div><div className="idle-title">Nothing reviewed yet</div><p className="idle-copy">Paste an input or use a sample to see the policy gate, request anatomy, and next actions.</p></div></div> :
               <div className="analysis-body">
                 <div className="analysis-summary"><div><div className="score-block"><span className="score-number">{analysis.score}</span><span className="score-denominator">/ 100</span></div><div className="score-label">Local signal score</div></div><div className={`summary-tag ${analysis.gate}`}>{analysis.privacyLabel}</div></div>
-                <div className="confidence-note"><Info size={15} aria-hidden="true" /><span>{analysis.confidence === "shape-only" ? "Confidence: shape-only. Address checksum and full receiver composition are not verified here." : "Confidence: format error. At least one address failed the local encoding-shape check."}</span></div>
+                <div className="confidence-note"><Info size={15} aria-hidden="true" /><span>{analysis.confidence === "shape-only" ? "Confidence: shape-only. Outer checksums are checked for supported Bech32 encodings; full receiver composition and wallet-level context are not verified here." : "Confidence: format error. At least one address failed the local encoding or checksum check."}</span></div>
                 <div className="section-label">Request anatomy</div>
                 <div className="anatomy-grid">
                   <div><span>Network</span><strong>{analysis.network}</strong></div>

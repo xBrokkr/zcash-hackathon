@@ -1,6 +1,6 @@
 export type FindingLevel = "block" | "review" | "note" | "pass";
 export type AnalysisGate = "pass" | "review" | "block";
-export type AddressValidation = "shape-only" | "invalid";
+export type AddressValidation = "shape-only" | "checksum-valid" | "invalid";
 
 export interface RuleDefinition {
   title: string;
@@ -28,7 +28,7 @@ export const RULES = {
   "zip321.network": { title: "Network mismatch", level: "block", source: "https://zips.z.cash/zip-0321#uri-semantics", fix: "Use only mainnet addresses or only testnet addresses in one request." },
   "zip321.mixed-privacy": { title: "Privacy levels are mixed", level: "review", source: "https://zcash.readthedocs.io/en/latest/rtd_pages/ux_wallet_checklist.html", fix: "Review every output. A multi-payment request is only as private as its most revealing output." },
   "address.transparent": { title: "Transparent receiver", level: "block", source: "https://zcash.readthedocs.io/en/latest/rtd_pages/ux_wallet_checklist.html", fix: "Use a shielded-capable address when the product promise requires privacy." },
-  "address.shape": { title: "Shielded-capable address shape", level: "pass", source: "https://zips.z.cash/zip-0316", fix: "Still perform wallet-level checksum and network validation before sending." },
+  "address.shape": { title: "Shielded-capable address shape", level: "pass", source: "https://zips.z.cash/zip-0316", fix: "Still let the wallet validate receiver composition and network context before sending." },
   "address.unknown": { title: "Address shape is not recognized", level: "block", source: "https://zips.z.cash/zip-0321#uri-semantics", fix: "Use a supported Zcash address encoding and verify it in a wallet." },
   "analysis.pass": { title: "Local policy rules pass", level: "pass", source: "https://zips.z.cash/zip-0321", fix: "A wallet must still perform complete address and transaction validation." },
 } as const satisfies Record<string, RuleDefinition>;
@@ -73,11 +73,57 @@ export interface Analysis {
 }
 
 const BASE58 = /^[1-9A-HJ-NP-Za-km-z]+$/;
-const BECH32_DATA = /^[023456789acdefghjklmnpqrstuvwxyz]+$/;
+const BECH32_CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
+const BECH32_GENERATOR = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3];
 
 function finding(id: RuleId, detail: string, scope?: string): Finding {
   const rule = RULES[id];
   return { id, title: rule.title, detail, level: rule.level, source: rule.source, fix: rule.fix, scope };
+}
+
+function bech32Polymod(values: number[]): number {
+  let checksum = 1;
+  for (const value of values) {
+    const top = checksum >>> 25;
+    checksum = ((checksum & 0x1ffffff) << 5) ^ value;
+    for (let index = 0; index < BECH32_GENERATOR.length; index += 1) {
+      if ((top >>> index) & 1) checksum ^= BECH32_GENERATOR[index] ?? 0;
+    }
+  }
+  return checksum >>> 0;
+}
+
+function bech32HrpExpand(hrp: string): number[] {
+  return [...hrp].map((character) => character.charCodeAt(0) >> 5).concat([0], [...hrp].map((character) => character.charCodeAt(0) & 31));
+}
+
+function convertBits(values: number[], fromBits: number, toBits: number): Uint8Array | null {
+  let accumulator = 0;
+  let bits = 0;
+  const output: number[] = [];
+  const maxValue = (1 << toBits) - 1;
+  const maxAccumulator = (1 << (fromBits + toBits - 1)) - 1;
+  for (const value of values) {
+    if (value < 0 || (value >> fromBits) !== 0) return null;
+    accumulator = ((accumulator << fromBits) | value) & maxAccumulator;
+    bits += fromBits;
+    while (bits >= toBits) {
+      bits -= toBits;
+      output.push((accumulator >> bits) & maxValue);
+    }
+  }
+  if (bits >= fromBits || ((accumulator << (toBits - bits)) & maxValue) !== 0) return null;
+  return Uint8Array.from(output);
+}
+
+function decodeBech32Payload(address: string, expectedHrp: string, variant: number): Uint8Array | null {
+  const lower = address.toLowerCase();
+  if (address !== lower && address !== address.toUpperCase()) return null;
+  const separator = lower.lastIndexOf("1");
+  if (separator < 1 || separator + 7 > lower.length || lower.slice(0, separator) !== expectedHrp) return null;
+  const values = [...lower.slice(separator + 1)].map((character) => BECH32_CHARSET.indexOf(character));
+  if (values.some((value) => value < 0) || bech32Polymod(bech32HrpExpand(expectedHrp).concat(values)) !== variant) return null;
+  return convertBits(values.slice(0, -6), 5, 8);
 }
 
 function classifyAddress(address: string): { classification: AddressClass; network: Network; validation: AddressValidation } {
@@ -86,22 +132,22 @@ function classifyAddress(address: string): { classification: AddressClass; netwo
   if (/^(t1|t3)/.test(lower)) return { classification: "transparent", network: "mainnet", validation: BASE58.test(value) && value.length >= 26 && value.length <= 40 ? "shape-only" : "invalid" };
   if (/^(tm|t2)/.test(lower)) return { classification: "transparent", network: "testnet", validation: BASE58.test(value) && value.length >= 26 && value.length <= 40 ? "shape-only" : "invalid" };
   if (lower.startsWith("zs1")) {
-    const data = lower.slice(3);
-    return { classification: "shielded", network: "mainnet", validation: data.length > 6 && BECH32_DATA.test(data) ? "shape-only" : "invalid" };
+    const payload = decodeBech32Payload(value, "zs", 1);
+    return { classification: "shielded", network: "mainnet", validation: payload?.length === 43 ? "checksum-valid" : "invalid" };
   }
   if (lower.startsWith("ztestsapling1")) {
-    const data = lower.slice("ztestsapling1".length);
-    return { classification: "shielded", network: "testnet", validation: data.length > 6 && BECH32_DATA.test(data) ? "shape-only" : "invalid" };
+    const payload = decodeBech32Payload(value, "ztestsapling", 1);
+    return { classification: "shielded", network: "testnet", validation: payload?.length === 43 ? "checksum-valid" : "invalid" };
   }
   const unifiedMainnetPrefix = ["u1", "zu1", "tu1"].find((prefix) => lower.startsWith(prefix));
   if (unifiedMainnetPrefix) {
-    const data = lower.slice(unifiedMainnetPrefix.length);
-    return { classification: "unified", network: "mainnet", validation: data.length > 6 && BECH32_DATA.test(data) ? "shape-only" : "invalid" };
+    const payload = decodeBech32Payload(value, unifiedMainnetPrefix.slice(0, -1), 0x2bc830a3);
+    return { classification: "unified", network: "mainnet", validation: payload && payload.length >= 16 ? "checksum-valid" : "invalid" };
   }
   const unifiedTestnetPrefix = ["utest1", "zutest1", "tutest1"].find((prefix) => lower.startsWith(prefix));
   if (unifiedTestnetPrefix) {
-    const data = lower.slice(unifiedTestnetPrefix.length);
-    return { classification: "unified", network: "testnet", validation: data.length > 6 && BECH32_DATA.test(data) ? "shape-only" : "invalid" };
+    const payload = decodeBech32Payload(value, unifiedTestnetPrefix.slice(0, -1), 0x2bc830a3);
+    return { classification: "unified", network: "testnet", validation: payload && payload.length >= 16 ? "checksum-valid" : "invalid" };
   }
   return { classification: "unknown", network: "unknown", validation: "invalid" };
 }
@@ -179,7 +225,7 @@ export function analyzeAddress(address: string): Analysis {
   if (classified.validation === "invalid") findings.push(finding("zip321.address-format", "The prefix is known, but the address body does not match the expected encoding character set or length."));
   if (classified.classification === "transparent") findings.push(finding("address.transparent", "The receiver is transparent, so sender, receiver, and value can be publicly visible."));
   if (classified.classification === "unknown") findings.push(finding("address.unknown", "The string does not match a supported Zcash address prefix."));
-  if (classified.classification === "shielded" || classified.classification === "unified") findings.push(finding("address.shape", "The address has a shielded-capable shape. This browser release does not verify the checksum or decode every receiver item."));
+  if (classified.classification === "shielded" || classified.classification === "unified") findings.push(finding("address.shape", "The address has a shielded-capable shape and a valid outer checksum. This browser release does not decode every Unified receiver item or prove wallet-level network context."));
   return makeAnalysis("address", normalized, entries, findings);
 }
 
@@ -270,7 +316,7 @@ export function analyzeUri(input: string): Analysis {
     const classified = classifyAddress(payment.address);
     const entry: PaymentEntry = { index, address: payment.address, ...classified, amount: payment.amount ?? null, hasMemo: payment.memoPresent, hasAssetRequest: payment.assetPresent };
     entries.push(entry);
-    if (classified.validation === "invalid") findings.push(finding("zip321.address-format", `Payment ${index || "0"} has a malformed ${classified.classification} address body.`, index || "0"));
+    if (classified.validation === "invalid") findings.push(finding("zip321.address-format", `Payment ${index || "0"} has a malformed ${classified.classification} address body or checksum.`, index || "0"));
     if (classified.classification === "unknown") findings.push(finding("address.unknown", `Payment ${index || "0"} uses an address shape that this release does not recognize.`, index || "0"));
     if (classified.classification === "transparent") findings.push(finding("zip321.transparent", `Payment ${index || "0"} is sent to a transparent receiver.`, index || "0"));
     if (!payment.amount && !payment.assetPresent) findings.push(finding("zip321.amount-missing", `Payment ${index || "0"} has no amount.`, index || "0"));
