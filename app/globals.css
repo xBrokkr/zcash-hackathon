@@ -160,6 +160,12 @@ textarea:focus-visible, button:focus-visible, a:focus-visible { outline: 2px sol
 
 .analysis-summary { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
 
+.gate-block { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+
+.gate-label { color: var(--subtle); font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }
+
+.score-summary { display: flex; flex-direction: column; align-items: flex-end; }
+
 .score-block { display: flex; align-items: baseline; gap: 8px; }
 
 .score-number { font-size: 36px; font-weight: 600; letter-spacing: -.05em; line-height: 1; }
